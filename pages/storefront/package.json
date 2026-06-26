@@ -1,0 +1,9 @@
+{
+  "name": "@solostore/storefront",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev src",
+    "deploy": "wrangler pages deploy src --project-name solostore-storefront"
+  }
+}

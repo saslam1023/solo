@@ -1,0 +1,4 @@
+packages:
+  - 'workers/*'
+  - 'pages/*'
+  - 'packages/*'

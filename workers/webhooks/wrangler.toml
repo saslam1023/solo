@@ -1,0 +1,15 @@
+name = "solostore-webhooks"
+main = "src/index.ts"
+compatibility_date = "2024-05-29"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "SOLOSTORE_KV"
+id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
+preview_id = "c0b19f5d88de4dce8ba7ffd706704c04"
+
+[vars]
+ENVIRONMENT = "development"
+
+# Secrets:
+#   STRIPE_WEBHOOK_SECRET
