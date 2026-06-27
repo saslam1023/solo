@@ -105,11 +105,11 @@ async function handlePaymentSucceeded(
   const orderId = (paymentIntent['metadata'] as Record<string, string>)?.['orderId'];
   if (!tenantId || !orderId) return;
 
-  const order = await env.KV.get(kvKey.order(tenantId, orderId), 'json') as Order | null;
+  const order = await env.SOLOSTORE_KV.get(kvKey.order(tenantId, orderId), 'json') as Order | null;
   if (!order) return;
 
   const updated: Order = { ...order, status: 'paid', updatedAt: Date.now() };
-  await env.KV.put(kvKey.order(tenantId, orderId), JSON.stringify(updated));
+  await env.SOLOSTORE_KV.put(kvKey.order(tenantId, orderId), JSON.stringify(updated));
 }
 
 async function handlePaymentFailed(
@@ -120,11 +120,11 @@ async function handlePaymentFailed(
   const orderId = (paymentIntent['metadata'] as Record<string, string>)?.['orderId'];
   if (!tenantId || !orderId) return;
 
-  const order = await env.KV.get(kvKey.order(tenantId, orderId), 'json') as Order | null;
+  const order = await env.SOLOSTORE_KV.get(kvKey.order(tenantId, orderId), 'json') as Order | null;
   if (!order) return;
 
   const updated: Order = { ...order, status: 'cancelled', updatedAt: Date.now() };
-  await env.KV.put(kvKey.order(tenantId, orderId), JSON.stringify(updated));
+  await env.SOLOSTORE_KV.put(kvKey.order(tenantId, orderId), JSON.stringify(updated));
 }
 
 async function handleAccountUpdated(

@@ -1,31 +1,32 @@
 // ─── Tenant ──────────────────────────────────────────────────────────────────
 
-export interface Tenant {
-  id: string;               // e.g. "tenant_abc123"
-  slug: string;             // e.g. "acme" → acme.solostore.com
-  name: string;
-  customDomain?: string;    // e.g. "shop.acme.com"
-  stripeAccountId?: string; // Stripe Connect Express account ID
-  plan: 'free' | 'pro' | 'enterprise';
-  createdAt: number;        // Unix ms
-  active: boolean;
+
+export type TenantStatus =
+  | 'pending_payment'
+  | 'pending_verification'
+  | 'pending_onboarding'
+  | 'pending_connect'
+  | 'pending_products'
+  | 'ready'
+  | 'live';
+
+export interface TenantMeta {
+  id: string;                  // e.g. "tenant_abc123"
+  slug?: string;               // set during onboarding
+  customDomain?: string;       // optional, set later
+  stripeCustomerId: string;    // platform subscription identity
+  stripeAccountId?: string;    // Connect Express — set after onboarding
+  status: TenantStatus;
+  createdAt: number;           // Unix ms
 }
 
-// ─── User / Session ──────────────────────────────────────────────────────────
+// ─── Session ─────────────────────────────────────────────────────────────────
+// Stored in KV under session:{sessionId}
+// tenantId is all we need — everything else comes from Stripe
 
-export interface User {
-  id: string;
+export interface SessionData {
   tenantId: string;
-  email: string;
-  role: 'owner' | 'admin' | 'staff';
-  createdAt: number;
-}
-
-export interface Session {
-  sessionId: string;
-  userId: string;
-  tenantId: string;
-  expiresAt: number;
+  createdAt: number;           // Unix ms
 }
 
 // ─── Product ─────────────────────────────────────────────────────────────────
@@ -72,32 +73,38 @@ export interface LineItem {
 // Pattern: tenant:{tenantId}:{resource}:{id}
 //
 // Global (cross-tenant) keys use prefix: global:{resource}:{id}
-
 export const kvKey = {
+  // Tenant record — source of truth for status + Stripe IDs
   tenant: (tenantId: string) =>
     `tenant:${tenantId}:meta`,
 
+  // Global lookups — slug/domain → tenantId
   tenantBySlug: (slug: string) =>
     `global:tenant_slug:${slug}`,
 
   tenantByDomain: (domain: string) =>
     `global:tenant_domain:${domain}`,
 
-  session: (tenantId: string, sessionId: string) =>
-    `tenant:${tenantId}:session:${sessionId}`,
+  // Auth — magic links and sessions
+  // No tenantId in session key — sessionId is globally unique
+  magicToken: (token: string) =>
+    `magic:${token}`,
 
-  user: (tenantId: string, userId: string) =>
-    `tenant:${tenantId}:user:${userId}`,
+  session: (sessionId: string) =>
+    `session:${sessionId}`,
 
-  userByEmail: (tenantId: string, email: string) =>
-    `tenant:${tenantId}:user_email:${email}`,
+  // Deferred actions — post-payment magic link queue
+  deferred: (tenantId: string) =>
+    `deferred:${tenantId}`,
 
+  // Commerce
   product: (tenantId: string, productId: string) =>
     `tenant:${tenantId}:product:${productId}`,
 
   order: (tenantId: string, orderId: string) =>
     `tenant:${tenantId}:order:${orderId}`,
 } as const;
+
 
 // ─── HTTP Helpers ─────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { parseSessionCookie, Session, Tenant, kvKey, errorResponse, jsonResponse } from '@solostore/shared';
 
 export interface Env {
-  KV: KVNamespace;
+  SOLOSTORE_KV: KVNamespace;
   SESSION_SECRET: string;
   ENVIRONMENT: string;
   // Service bindings — added when api worker exists
@@ -31,19 +31,36 @@ function isBlockedPath(pathname: string): boolean {
 
 async function resolveTenant(request: Request, kv: KVNamespace): Promise<Tenant | null> {
   const host = request.headers.get('host') ?? '';
-  const hostname = host.split(':')[0]; // strip port in local dev
+  const devHost = request.headers.get('x-dev-host');
+  const hostname = (devHost ?? host).split(':')[0];
+
+ 
 
   // Try custom domain first
-  const byDomain = await kv.get(kvKey.tenantByDomain(hostname), 'json') as Tenant | null;
-  if (byDomain) return byDomain;
+  const domainTenantId = await kv.get(kvKey.tenantByDomain(hostname)) as string | null;
 
-  // Try subdomain: expects {slug}.solostore.com or {slug}.localhost
+  if (domainTenantId) {
+    const tenant = await kv.get(kvKey.tenant(domainTenantId), 'json') as Tenant | null;
+    if (tenant) return tenant;
+  }
+
+  // Try subdomain slug
   const parts = hostname.split('.');
-  if (parts.length >= 2) {
-    const slug = parts[0];
-    if (slug && slug !== 'www' && slug !== 'app') {
-      const bySlug = await kv.get(kvKey.tenantBySlug(slug), 'json') as Tenant | null;
-      if (bySlug) return bySlug;
+  const slug = parts[0];
+ 
+
+  if (parts.length >= 2 && slug && slug !== 'www' && slug !== 'app') {
+    const slugKey = kvKey.tenantBySlug(slug);
+   
+    const slugTenantId = await kv.get(slugKey) as string | null;
+   
+
+    if (slugTenantId) {
+      const metaKey = kvKey.tenant(slugTenantId);
+   
+      const tenant = await kv.get(metaKey, 'json') as Tenant | null;
+    
+      if (tenant) return tenant;
     }
   }
 
@@ -84,7 +101,7 @@ export default {
     }
 
     // ── Resolve tenant ──
-    const tenant = await resolveTenant(request, env.KV);
+    const tenant = await resolveTenant(request, env.SOLOSTORE_KV);
     if (!tenant) {
       return errorResponse('Store not found', 404);
     }
@@ -98,7 +115,7 @@ export default {
     forwardedHeaders.set('X-Tenant-Slug', tenant.slug);
 
     // ── Attach session context if present ──
-    const session = await getSession(request, tenant.id, env.KV);
+    const session = await getSession(request, tenant.id, env.SOLOSTORE_KV);
     if (session) {
       forwardedHeaders.set('X-Session-Id', session.sessionId);
       forwardedHeaders.set('X-User-Id', session.userId);
