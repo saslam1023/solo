@@ -1,15 +1,60 @@
+# workers/webhooks/wrangler.toml
+
 name = "solostore-webhooks"
 main = "src/index.ts"
-compatibility_date = "2024-05-29"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+[dev]
+port = 8788
+
+
+# ---------------------------------------------------------------------------
+# KV namespace binding
+# Replace with your actual namespace IDs.
+# Preview ID is used by `wrangler dev --remote`.
+# ---------------------------------------------------------------------------
 [[kv_namespaces]]
 binding = "SOLOSTORE_KV"
-id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
-preview_id = "c0b19f5d88de4dce8ba7ffd706704c04"
+id = "f71e79c3fcc24c8c8516ddfbc5ed050d"          # production namespace ID
+preview_id = "c0b19f5d88de4dce8ba7ffd706704c04"  # reuse preview for dev
 
+# ---------------------------------------------------------------------------
+# Cron triggers
+#
+# "* * * * *" = every minute.
+#
+# Why every minute and not less frequent?
+# The deferred key is written by the webhook handler immediately after payment.
+# We want the first magic link to arrive within ~60 seconds of checkout
+# completion. A 5-minute cron would mean the merchant waits up to 5 minutes
+# to receive their first sign-in link — too long for a post-payment UX.
+#
+# In production you may want to throttle to "*/2 * * * *" (every 2 minutes)
+# if cron costs become a concern, but the UX tradeoff is small.
+# ---------------------------------------------------------------------------
+[triggers]
+crons = ["* * * * *"]
+
+# ---------------------------------------------------------------------------
+# Environment variables
+# Secrets (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY) must be
+# set via `wrangler secret put` — never hardcoded here.
+# ---------------------------------------------------------------------------
 [vars]
 ENVIRONMENT = "development"
+RESEND_FROM = "SoloStore <onboarding@headorn.com>"
 
-# Secrets:
-#   STRIPE_WEBHOOK_SECRET
+# ---------------------------------------------------------------------------
+# Production environment overrides
+# ---------------------------------------------------------------------------
+[env.production]
+name = "solostore-webhooks-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+RESEND_FROM = "SoloStore <onboarding@headorn.com>"
+
+[[env.production.kv_namespaces]]
+binding = "SOLOSTORE_KV"
+id = "f71e79c3fcc24c8c8516ddfbc5ed050d"

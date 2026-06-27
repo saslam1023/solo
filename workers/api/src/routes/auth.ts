@@ -62,9 +62,6 @@ export async function handleMagicLink(
       data: Array<{ id: string; metadata?: { tenantId?: string } }>;
     };
 
-    console.log('debug: stripe customers found:', stripeData.data?.length);
-    console.log('debug: customer id returned:', stripeData.data[0]?.id);
-console.log('debug: raw metadata:', JSON.stringify(stripeData.data[0]?.metadata));
 
     if (!stripeData.data?.length) {
       console.log('debug: bailing — no customer');
@@ -73,7 +70,6 @@ console.log('debug: raw metadata:', JSON.stringify(stripeData.data[0]?.metadata)
 
     const customer = stripeData.data[0];
     const tenantId = customer.metadata?.tenantId;
-    console.log('debug: tenantId from metadata:', tenantId);
 
     if (!tenantId) {
       console.log('debug: bailing — no tenantId');

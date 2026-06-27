@@ -6,12 +6,18 @@ import {
   handleLogout,
   handleMe,
 } from './routes/auth';
+import { handleRegister } from './handlers/register';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method;
     const path = url.pathname;
+
+    // ── Registration (public, no auth) ────────────────────────────
+    if (path === '/register' && method === 'POST') {
+      return handleRegister(request, env);
+    }
 
     // ── Auth routes ───────────────────────────────────────────────
     if (path === '/auth/magic-link' && method === 'POST') {
