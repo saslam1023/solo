@@ -29,6 +29,7 @@ export interface Env {
   ENVIRONMENT: string;
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
+  STRIPE_CONNECT_WEBHOOK_SECRET: string;   // Phase 5
   RESEND_API_KEY: string;
   RESEND_FROM: string;
 }
@@ -298,6 +299,64 @@ async function handleCheckoutCompleted(
  * KV list() returns up to 1000 keys per call. For a high-volume system this
  * would need cursor pagination, but is sufficient for the current phase.
  */
+
+// ---------------------------------------------------------------------------
+// account.updated handler (Phase 5)
+// ---------------------------------------------------------------------------
+
+interface StripeAccount {
+  id: string;
+  details_submitted: boolean;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  requirements?: {
+    currently_due: string[];
+    errors: Array<{ code: string; reason: string; requirement: string }>;
+  };
+}
+
+async function handleAccountUpdated(
+  account: StripeAccount,
+  env: Env
+): Promise<void> {
+  // Reverse-lookup: Connect account ID → tenantId
+  const tenantId = await env.SOLOSTORE_KV.get(
+    kvKey.connectAccountTenant(account.id)
+  );
+
+  if (!tenantId) {
+    console.warn(`[webhook] account.updated: no tenant for account ${account.id}`);
+    return;
+  }
+
+  const metaRaw = await env.SOLOSTORE_KV.get(kvKey.tenant(tenantId));
+  if (!metaRaw) {
+    console.error(`[webhook] account.updated: no meta for tenant ${tenantId}`);
+    return;
+  }
+
+  const meta = JSON.parse(metaRaw) as TenantMeta;
+
+  const advanceable: TenantStatus[] = ['pending_verification', 'pending_connect'];
+  if (!advanceable.includes(meta.status)) {
+    // Already past this stage — idempotent
+    return;
+  }
+
+  if (
+    account.details_submitted &&
+    account.charges_enabled &&
+    account.payouts_enabled
+  ) {
+    const updated: TenantMeta = { ...meta, status: 'pending_products' };
+    await env.SOLOSTORE_KV.put(kvKey.tenant(tenantId), JSON.stringify(updated));
+    console.log(`[webhook] Tenant ${tenantId} advanced to pending_products`);
+  } else {
+    const due = account.requirements?.currently_due ?? [];
+    console.log(`[webhook] account.updated: ${tenantId} not yet fully verified. currently_due=${JSON.stringify(due)}`);
+  }
+}
+
 async function handleCron(env: Env): Promise<void> {
   const prefix = "deferred:";
   const list = await env.SOLOSTORE_KV.list({ prefix });
@@ -347,7 +406,7 @@ async function handleCron(env: Env): Promise<void> {
       const baseUrl =
         env.ENVIRONMENT === "production"
           ? `https://${slug}.solostore.io`
-          : `http://localhost:8100`;
+          : `http://localhost:8787`;
 
       const magicUrl = `${baseUrl}/auth/verify?token=${token}`;
 
@@ -437,11 +496,16 @@ export default {
               env
             );
             break;
+            case 'account.updated':
+            await handleAccountUpdated(
+              event.data.object as StripeAccount,
+              env
+            );
+            break;
 
           // Future events wired here:
           // case "customer.subscription.deleted": ...
           // case "invoice.payment_failed": ...
-          // case "account.updated": ...  (Connect)
           default:
             console.log(`[webhook] Unhandled event type: ${event.type}`);
         }

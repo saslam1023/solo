@@ -7,6 +7,12 @@ import {
   handleMe,
 } from './routes/auth';
 import { handleRegister } from './handlers/register';
+import {
+  handleConnectStart,
+  handleConnectReturn,
+  handleConnectRefresh,
+} from './handlers/connect';
+
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -34,6 +40,17 @@ export default {
 
     if (path === '/auth/me' && method === 'GET') {
       return handleMe(request, env);
+    }
+
+    // ── Connect routes  ──────────────────────────────────
+    if (path === '/connect/start' && method === 'POST') {
+      return handleConnectStart(request, env);
+    }
+    if (path === '/connect/return' && method === 'GET') {
+      return handleConnectReturn(request, env);
+    }
+    if (path === '/connect/refresh' && method === 'GET') {
+      return handleConnectRefresh(request, env);
     }
 
     // ── 404 ───────────────────────────────────────────────────────

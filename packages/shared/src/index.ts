@@ -103,6 +103,11 @@ export const kvKey = {
 
   order: (tenantId: string, orderId: string) =>
     `tenant:${tenantId}:order:${orderId}`,
+
+  // Phase 5: reverse lookup — Connect account ID → tenantId
+  // Written when Connect account is created. Read by account.updated webhook.
+  connectAccountTenant: (stripeAccountId: string) =>
+    `global:connect_account:${stripeAccountId}`,
 } as const;
 
 
