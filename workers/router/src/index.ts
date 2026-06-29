@@ -1,14 +1,47 @@
-import { parseSessionCookie, Session, Tenant, kvKey, errorResponse, jsonResponse } from '@solostore/shared';
+/**
+ * workers/router/src/index.ts
+ *
+ * Front door for all SoloStore traffic.
+ *
+ * Responsibilities:
+ *   1. WAF — block malicious paths before any processing
+ *   2. Tenant resolution — subdomain or custom domain → TenantMeta
+ *   3. Status gate — only 'ready' or 'live' tenants serve traffic
+ *   4. Forward to API worker via service binding (prod) or fetch (dev)
+ *
+ * What the router does NOT do:
+ *   - Session validation (API worker owns auth)
+ *   - Business logic (API worker owns that)
+ *   - Store PII (GDPR-minimal — only reads KV for tenant resolution)
+ *
+ * Tenant resolution order:
+ *   1. X-Dev-Host header (dev only — simulates subdomain without DNS)
+ *   2. Custom domain → global:tenant_domain:{hostname}
+ *   3. Subdomain slug → global:tenant_slug:{slug}
+ *
+ * Security:
+ *   - WAF runs before tenant resolution — no KV reads on blocked paths
+ *   - Tenant ID passed to API worker via X-Tenant-Id header (internal only)
+ *   - X-Tenant-Id set by router and cannot be spoofed by clients
+ *     (router strips any incoming X-Tenant-Id before forwarding)
+ */
+
+import { kvKey, type TenantMeta } from '@solostore/shared';
+
+// ─── Env ─────────────────────────────────────────────────────────────────────
 
 export interface Env {
   SOLOSTORE_KV: KVNamespace;
-  SESSION_SECRET: string;
   ENVIRONMENT: string;
-  // Service bindings — added when api worker exists
+  API_WORKER_URL: string;   // dev only: http://localhost:8787
+  // Service binding — uncomment when deploying:
   // API: Fetcher;
 }
 
 // ─── WAF: Blocked paths ───────────────────────────────────────────────────────
+//
+// Block common attack patterns before any processing.
+// Returns 404 for all blocked paths — don't leak that we detected the attack.
 
 const BLOCKED_PATH_PATTERNS = [
   /^\/\.env/,
@@ -16,7 +49,12 @@ const BLOCKED_PATH_PATTERNS = [
   /^\/phpmyadmin/,
   /^\/admin\.php/,
   /^\/xmlrpc\.php/,
-  /\.\.(\/|\\)/,   // path traversal
+  /\.\.(\/|\\)/,        // path traversal
+  /^\/etc\//,           // unix file access
+  /^\/proc\//,          // process info
+  /\0/,                 // null byte injection
+  /^\/\.git/,           // git exposure
+  /^\/\.ssh/,           // ssh key exposure
 ];
 
 function isBlockedPath(pathname: string): boolean {
@@ -24,42 +62,39 @@ function isBlockedPath(pathname: string): boolean {
 }
 
 // ─── Tenant resolution ───────────────────────────────────────────────────────
-//
-// Resolution order:
-//   1. Custom domain   → global:tenant_domain:{host}
-//   2. Subdomain slug  → global:tenant_slug:{slug}
 
-async function resolveTenant(request: Request, kv: KVNamespace): Promise<Tenant | null> {
-  const host = request.headers.get('host') ?? '';
-  const devHost = request.headers.get('x-dev-host');
-  const hostname = (devHost ?? host).split(':')[0];
+async function resolveTenant(
+  request: Request,
+  kv: KVNamespace,
+  env: Env
+): Promise<TenantMeta | null> {
+  // In dev, X-Dev-Host simulates a subdomain without real DNS.
+  // Strip port from host header.
+  const rawHost = request.headers.get('x-dev-host')
+    ?? request.headers.get('host')
+    ?? '';
+  const hostname = rawHost.split(':')[0].toLowerCase();
 
- 
+  if (!hostname) return null;
 
-  // Try custom domain first
-  const domainTenantId = await kv.get(kvKey.tenantByDomain(hostname)) as string | null;
-
+  // ── 1. Custom domain lookup ───────────────────────────────────────────────
+  const domainTenantId = await kv.get(kvKey.tenantByDomain(hostname));
   if (domainTenantId) {
-    const tenant = await kv.get(kvKey.tenant(domainTenantId), 'json') as Tenant | null;
+    const tenant = await kv.get<TenantMeta>(kvKey.tenant(domainTenantId), 'json');
     if (tenant) return tenant;
   }
 
-  // Try subdomain slug
+  // ── 2. Subdomain slug lookup ──────────────────────────────────────────────
+  // e.g. testshop5.headorn.com → slug = testshop5
   const parts = hostname.split('.');
   const slug = parts[0];
- 
 
-  if (parts.length >= 2 && slug && slug !== 'www' && slug !== 'app') {
-    const slugKey = kvKey.tenantBySlug(slug);
-   
-    const slugTenantId = await kv.get(slugKey) as string | null;
-   
-
+  // Must have at least two parts and not be a reserved subdomain
+  const reserved = ['www', 'app', 'api', 'admin', 'mail', 'ftp'];
+  if (parts.length >= 2 && slug && !reserved.includes(slug)) {
+    const slugTenantId = await kv.get(kvKey.tenantBySlug(slug));
     if (slugTenantId) {
-      const metaKey = kvKey.tenant(slugTenantId);
-   
-      const tenant = await kv.get(metaKey, 'json') as Tenant | null;
-    
+      const tenant = await kv.get<TenantMeta>(kvKey.tenant(slugTenantId), 'json');
       if (tenant) return tenant;
     }
   }
@@ -67,76 +102,78 @@ async function resolveTenant(request: Request, kv: KVNamespace): Promise<Tenant 
   return null;
 }
 
-// ─── Auth: validate session ───────────────────────────────────────────────────
+// ─── Forward request ──────────────────────────────────────────────────────────
 
-async function getSession(request: Request, tenantId: string, kv: KVNamespace): Promise<Session | null> {
-  const cookieHeader = request.headers.get('cookie');
-  const sessionId = parseSessionCookie(cookieHeader);
-  if (!sessionId) return null;
+async function forwardToApi(
+  request: Request,
+  tenant: TenantMeta,
+  env: Env
+): Promise<Response> {
+  // Strip any client-supplied X-Tenant-* headers — prevent spoofing
+  const headers = new Headers(request.headers);
+  headers.delete('x-tenant-id');
+  headers.delete('x-tenant-slug');
 
-  const session = await kv.get(kvKey.session(tenantId, sessionId), 'json') as Session | null;
-  if (!session) return null;
-  if (Date.now() > session.expiresAt) {
-    // Expired — clean up lazily
-    await kv.delete(kvKey.session(tenantId, sessionId));
-    return null;
-  }
-  return session;
+  // Attach verified tenant context for API worker
+  headers.set('x-tenant-id', tenant.id);
+  headers.set('x-tenant-slug', tenant.slug ?? '');
+
+  const forwardedRequest = new Request(request.url, {
+    method: request.method,
+    headers,
+    body: request.body,
+  });
+
+  // Production: use service binding (zero latency, no egress cost)
+  // if (env.API) return env.API.fetch(forwardedRequest);
+
+  // Dev: proxy via fetch to local API worker
+  return fetch(forwardedRequest);
 }
 
-// ─── Handler ─────────────────────────────────────────────────────────────────
+// ─── Main handler ─────────────────────────────────────────────────────────────
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // ── WAF ──
+    // ── WAF — runs before everything, no KV reads ─────────────────────────
     if (isBlockedPath(url.pathname)) {
-      return new Response('Not Found', { status: 404 });
+      // Return 404 not 403 — don't confirm the path exists
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // ── Health check (no tenant required) ──
+    // ── Health check — no tenant required ─────────────────────────────────
     if (url.pathname === '/healthz') {
-      return jsonResponse({ ok: true, service: 'router' });
+      return new Response(JSON.stringify({ ok: true, service: 'router' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // ── Resolve tenant ──
-    const tenant = await resolveTenant(request, env.SOLOSTORE_KV);
+    // ── Tenant resolution ─────────────────────────────────────────────────
+    const tenant = await resolveTenant(request, env.SOLOSTORE_KV, env);
+
     if (!tenant) {
-      return errorResponse('Store not found', 404);
-    }
-    if (!tenant.active) {
-      return errorResponse('Store is inactive', 403);
-    }
-
-    // ── Attach tenant context to forwarded request ──
-    const forwardedHeaders = new Headers(request.headers);
-    forwardedHeaders.set('X-Tenant-Id', tenant.id);
-    forwardedHeaders.set('X-Tenant-Slug', tenant.slug);
-
-    // ── Attach session context if present ──
-    const session = await getSession(request, tenant.id, env.SOLOSTORE_KV);
-    if (session) {
-      forwardedHeaders.set('X-Session-Id', session.sessionId);
-      forwardedHeaders.set('X-User-Id', session.userId);
-      forwardedHeaders.set('X-User-Role', 'authenticated'); // role fetched in api worker
+      return new Response(JSON.stringify({ error: 'Store not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // ── Forward to API worker ──
-    // Until service binding is wired, proxy via fetch (dev only)
-    // When deployed: env.API.fetch(...)
-    const proxiedRequest = new Request(request.url, {
-      method: request.method,
-      headers: forwardedHeaders,
-      body: request.body,
-    });
+    // ── Status gate ───────────────────────────────────────────────────────
+    // Only serve traffic for tenants that have completed setup
+    const activeStatuses = ['ready', 'live'];
+    if (!activeStatuses.includes(tenant.status)) {
+      return new Response(JSON.stringify({ error: 'Store is not yet active' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Placeholder: in Phase 2 this becomes a service binding call
-    return jsonResponse({
-      message: 'Router OK — tenant resolved',
-      tenant: tenant.slug,
-      path: url.pathname,
-      authenticated: !!session,
-    });
+    // ── Forward to API worker ─────────────────────────────────────────────
+    return forwardToApi(request, tenant, env);
   },
 };

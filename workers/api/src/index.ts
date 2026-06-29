@@ -28,6 +28,10 @@ import {
   handleUpdateOrderStatus,
 } from './handlers/orders';
 import { handleStorefrontCheckout } from './handlers/checkout';
+import {
+  handleStorefrontListProducts,
+  handleStorefrontGetProduct,
+} from './handlers/storefront';
 import { requireAuth } from './lib/auth';
 
 export default {
@@ -72,6 +76,13 @@ export default {
     // ── Storefront routes (public, no merchant auth) ───────────────
     if (path === '/storefront/checkout' && method === 'POST') {
       return handleStorefrontCheckout(request, env);
+    }
+    if (path === '/storefront/products' && method === 'GET') {
+      return handleStorefrontListProducts(request, env);
+    }
+    if (path.match(/^\/storefront\/products\/[^/]+$/) && method === 'GET') {
+      const productId = path.split('/')[3];
+      return handleStorefrontGetProduct(request, env, productId);
     }
 
     // ── Product routes (all require merchant auth) ─────────────────

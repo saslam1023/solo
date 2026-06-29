@@ -3,7 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-05-29"
 compatibility_flags = ["nodejs_compat"]
 
-# KV namespace — create with: wrangler kv namespace create SOLOSTORE_KV
+[dev]
+port = 8786
+
 [[kv_namespaces]]
 binding = "SOLOSTORE_KV"
 id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
@@ -11,6 +13,16 @@ preview_id = "c0b19f5d88de4dce8ba7ffd706704c04"
 
 [vars]
 ENVIRONMENT = "development"
+API_WORKER_URL = "http://localhost:8787"
 
-# Secrets (set via wrangler secret put):
-#   SESSION_SECRET
+# Production environment overrides
+[env.production]
+name = "solostore-router-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+API_WORKER_URL = ""  # not used in prod — service binding used instead
+
+[[env.production.kv_namespaces]]
+binding = "SOLOSTORE_KV"
+id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
