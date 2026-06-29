@@ -12,7 +12,17 @@ import {
   handleConnectReturn,
   handleConnectRefresh,
 } from './handlers/connect';
-
+import {
+  handleCreateProduct,
+  handleListProducts,
+  handleGetProduct,
+  handleUpdateProduct,
+  handleUpdateVariant,
+  handleArchiveProduct,
+  handleArchiveVariant,
+  handleUploadProductImage,
+} from './handlers/products';
+import { requireAuth } from './lib/auth';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -42,7 +52,7 @@ export default {
       return handleMe(request, env);
     }
 
-    // ── Connect routes  ──────────────────────────────────
+    // ── Connect routes ────────────────────────────────────────────
     if (path === '/connect/start' && method === 'POST') {
       return handleConnectStart(request, env);
     }
@@ -51,6 +61,44 @@ export default {
     }
     if (path === '/connect/refresh' && method === 'GET') {
       return handleConnectRefresh(request, env);
+    }
+
+    // ── Product routes (all require auth) ─────────────────────────
+    if (path.startsWith('/products')) {
+      const session = await requireAuth(request, env);
+      if (session instanceof Response) return session;
+      const { tenantId } = session;
+
+      if (path === '/products' && method === 'POST') {
+        return handleCreateProduct(request, env, tenantId);
+      }
+      if (path === '/products' && method === 'GET') {
+        return handleListProducts(request, env, tenantId);
+      }
+      if (path.match(/^\/products\/[^/]+$/) && method === 'GET') {
+        const productId = path.split('/')[2];
+        return handleGetProduct(request, env, tenantId, productId);
+      }
+      if (path.match(/^\/products\/[^/]+$/) && method === 'PATCH') {
+        const productId = path.split('/')[2];
+        return handleUpdateProduct(request, env, tenantId, productId);
+      }
+      if (path.match(/^\/products\/[^/]+$/) && method === 'DELETE') {
+        const productId = path.split('/')[2];
+        return handleArchiveProduct(request, env, tenantId, productId);
+      }
+      if (path.match(/^\/products\/[^/]+\/variants\/[^/]+$/) && method === 'PATCH') {
+        const parts = path.split('/');
+        return handleUpdateVariant(request, env, tenantId, parts[2], parts[4]);
+      }
+      if (path.match(/^\/products\/[^/]+\/variants\/[^/]+$/) && method === 'DELETE') {
+        const parts = path.split('/');
+        return handleArchiveVariant(request, env, tenantId, parts[2], parts[4]);
+      }
+      if (path.match(/^\/products\/[^/]+\/images$/) && method === 'POST') {
+        const productId = path.split('/')[2];
+        return handleUploadProductImage(request, env, tenantId, productId);
+      }
     }
 
     // ── 404 ───────────────────────────────────────────────────────

@@ -89,12 +89,12 @@ export async function handleConnectStart(
   }
 
   // Issue Account Link (expires ~5 min — /connect/refresh handles expiry)
-  const origin = env.ENVIRONMENT === 'development'
-  ? 'http://localhost:8787'
-  : `https://api.headorn.com`;  const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
+
+  
+  const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
     account: accountId,
-    refresh_url: `${origin}/connect/refresh`,
-    return_url: `${origin}/connect/return`,
+    refresh_url: `${env.API_BASE_URL}/connect/refresh`,
+    return_url: `${env.API_BASE_URL}/connect/return`,
     type: 'account_onboarding',
   });
 
@@ -170,12 +170,10 @@ export async function handleConnectRefresh(
     return json({ error: 'No Connect account found — start onboarding first' }, 400);
   }
 
-  const origin = env.ENVIRONMENT === 'development'
-  ? 'http://localhost:8787'
-  : `https://api.headorn.com`;  const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
+const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
     account: tenant.stripeAccountId,
-    refresh_url: `${origin}/connect/refresh`,
-    return_url: `${origin}/connect/return`,
+    refresh_url: `${env.API_BASE_URL}/connect/refresh`,
+    return_url: `${env.API_BASE_URL}/connect/return`,
     type: 'account_onboarding',
   });
 

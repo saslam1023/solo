@@ -34,6 +34,9 @@ importers:
       '@solostore/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      stripe:
+        specifier: ^22.3.0
+        version: 22.3.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20240529.0
@@ -912,6 +915,15 @@ packages:
     resolution: {integrity: sha512-KXDYZ9dszj6bzvnEMRYvxgeTHU74QBFL54XKtP3nyMuJ81CFYtABZ3bAzL2EdFUaEwJOBOgENyFj3R7oTzDyyw==}
     engines: {node: '>=4', npm: '>=6'}
 
+  stripe@22.3.0:
+    resolution: {integrity: sha512-ypO6xjVrMWs9SmIMeHr8naCx3dAQ0clxMdUTxn7Ejd7hmY9meBGfE+N4pVHkf9sUNebAHp6uJo6mV3GxDIc2cA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
     engines: {node: '>=18'}
@@ -1678,6 +1690,8 @@ snapshots:
       get-source: 2.0.12
 
   stoppable@1.1.0: {}
+
+  stripe@22.3.0: {}
 
   supports-color@10.2.2: {}
 

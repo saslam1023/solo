@@ -1,3 +1,5 @@
+/* packages/shared/src/index.ts */
+
 // ─── Tenant ──────────────────────────────────────────────────────────────────
 
 
@@ -98,11 +100,10 @@ export const kvKey = {
     `deferred:${tenantId}`,
 
   // Commerce
-  product: (tenantId: string, productId: string) =>
-    `tenant:${tenantId}:product:${productId}`,
-
-  order: (tenantId: string, orderId: string) =>
-    `tenant:${tenantId}:order:${orderId}`,
+product: (tenantId: string, productId: string) => `tenant:${tenantId}:product:${productId}`,
+  productList: (tenantId: string) => `tenant:${tenantId}:product:`,
+  order: (tenantId: string, orderId: string) => `tenant:${tenantId}:order:${orderId}`,
+  platformConfig: (key: string) => `global:config:${key}`,
 
   // Phase 5: reverse lookup — Connect account ID → tenantId
   // Written when Connect account is created. Read by account.updated webhook.

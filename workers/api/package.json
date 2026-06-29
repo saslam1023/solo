@@ -8,7 +8,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@solostore/shared": "workspace:*"
+    "@solostore/shared": "workspace:*",
+    "stripe": "^22.3.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240529.0",

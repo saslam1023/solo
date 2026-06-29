@@ -90,11 +90,9 @@ export async function handleMagicLink(
     }
 
     const token = await createMagicToken(env, tenantId);
-    const baseUrl = env.ENVIRONMENT === 'development'
-      ? 'http://localhost:8787'
-      : 'https://api.solostore.co.uk';
 
-    const magicUrl = `${baseUrl}/auth/verify?token=${token}`;
+
+const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
 
     const resendRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',

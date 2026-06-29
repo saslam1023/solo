@@ -1,5 +1,8 @@
+/* workers/api/src/lib/auth.ts */
+
 import { Env } from '../types/env';
-import { kvKey, TenantMeta } from '@solostore/shared';
+import { kvKey, TenantMeta, parseSessionCookie } from '@solostore/shared';
+
 
 // ── Token generation ──────────────────────────────────────────────
 
@@ -88,4 +91,25 @@ export async function getTenantMeta(
   const raw = await env.SOLOSTORE_KV.get(kvKey.tenant(tenantId));
   if (!raw) return null;
   return JSON.parse(raw) as TenantMeta;
+}
+
+// ── Request auth guard ────────────────────────────────────────────
+
+export async function requireAuth(
+  request: Request,
+  env: Env
+): Promise<{ tenantId: string } | Response> {
+  const cookieHeader = request.headers.get('cookie');
+  const sessionId = parseSessionCookie(cookieHeader);
+
+  if (!sessionId) {
+    return Response.json({ error: 'Unauthorised' }, { status: 401 });
+  }
+
+  const session = await getSession(env, sessionId);
+  if (!session) {
+    return Response.json({ error: 'Session expired or invalid' }, { status: 401 });
+  }
+
+  return { tenantId: session.tenantId };
 }
