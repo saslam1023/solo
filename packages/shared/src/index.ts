@@ -2,7 +2,6 @@
 
 // ─── Tenant ──────────────────────────────────────────────────────────────────
 
-
 export type TenantStatus =
   | 'pending_payment'
   | 'pending_verification'
@@ -31,42 +30,42 @@ export interface SessionData {
   createdAt: number;           // Unix ms
 }
 
-// ─── Product ─────────────────────────────────────────────────────────────────
-
-export interface Product {
-  id: string;
-  tenantId: string;
-  name: string;
-  description: string;
-  priceInCents: number;
-  currency: string;
-  imageKey?: string;          // R2 object key
-  active: boolean;
-  createdAt: number;
-}
-
 // ─── Order ───────────────────────────────────────────────────────────────────
 
 export type OrderStatus = 'pending' | 'paid' | 'fulfilled' | 'refunded' | 'cancelled';
 
+export interface OrderLineItem {
+  variantId: string;
+  productId: string;
+  productName: string;
+  variantLabel: string;       // e.g. "Red / Large", or product name if no colour/size
+  stripePriceId: string;
+  quantity: number;
+  unitPricePence: number;
+  subtotalPence: number;
+}
+
+export interface ShippingAddress {
+  line1: string;
+  line2?: string;
+  city: string;
+  postcode: string;
+  country: string;
+}
+
 export interface Order {
   id: string;
   tenantId: string;
-  customerId: string;
-  lineItems: LineItem[];
-  totalInCents: number;
-  currency: string;
+  stripeSessionId: string;            // Checkout Session ID — primary Stripe reference
+  stripePaymentIntentId?: string;     // set when paid (from webhook)
+  buyerEmail: string;                 // sourced from Stripe session — not indexed
+  lineItems: OrderLineItem[];
+  totalPence: number;
+  currency: 'gbp';
   status: OrderStatus;
-  stripePaymentIntentId?: string;
+  shippingAddress?: ShippingAddress;  // physical products only
   createdAt: number;
   updatedAt: number;
-}
-
-export interface LineItem {
-  productId: string;
-  name: string;
-  quantity: number;
-  unitPriceInCents: number;
 }
 
 // ─── KV Key Helpers ──────────────────────────────────────────────────────────
@@ -88,7 +87,6 @@ export const kvKey = {
     `global:tenant_domain:${domain}`,
 
   // Auth — magic links and sessions
-  // No tenantId in session key — sessionId is globally unique
   magicToken: (token: string) =>
     `magic:${token}`,
 
@@ -99,14 +97,31 @@ export const kvKey = {
   deferred: (tenantId: string) =>
     `deferred:${tenantId}`,
 
-  // Commerce
-product: (tenantId: string, productId: string) => `tenant:${tenantId}:product:${productId}`,
-  productList: (tenantId: string) => `tenant:${tenantId}:product:`,
-  order: (tenantId: string, orderId: string) => `tenant:${tenantId}:order:${orderId}`,
-  platformConfig: (key: string) => `global:config:${key}`,
+  // Commerce — products
+  product: (tenantId: string, productId: string) =>
+    `tenant:${tenantId}:product:${productId}`,
 
-  // Phase 5: reverse lookup — Connect account ID → tenantId
-  // Written when Connect account is created. Read by account.updated webhook.
+  productList: (tenantId: string) =>
+    `tenant:${tenantId}:product:`,
+
+  // Commerce — orders
+  order: (tenantId: string, orderId: string) =>
+    `tenant:${tenantId}:order:${orderId}`,
+
+  orderList: (tenantId: string) =>
+    `tenant:${tenantId}:order:`,
+
+  // Reverse lookup: Stripe Checkout Session ID → { tenantId, orderId }
+  // Written at checkout creation, read by webhook to find the right order.
+  // Server-side only — never exposed via any public route.
+  stripeSession: (stripeSessionId: string) =>
+    `global:stripe_session:${stripeSessionId}`,
+
+  // Platform config — product limit, fee config, etc.
+  platformConfig: (key: string) =>
+    `global:config:${key}`,
+
+  // Reverse lookup — Connect account ID → tenantId
   connectAccountTenant: (stripeAccountId: string) =>
     `global:connect_account:${stripeAccountId}`,
 } as const;

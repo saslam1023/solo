@@ -22,6 +22,12 @@ import {
   handleArchiveVariant,
   handleUploadProductImage,
 } from './handlers/products';
+import {
+  handleListOrders,
+  handleGetOrder,
+  handleUpdateOrderStatus,
+} from './handlers/orders';
+import { handleStorefrontCheckout } from './handlers/checkout';
 import { requireAuth } from './lib/auth';
 
 export default {
@@ -63,7 +69,12 @@ export default {
       return handleConnectRefresh(request, env);
     }
 
-    // ── Product routes (all require auth) ─────────────────────────
+    // ── Storefront routes (public, no merchant auth) ───────────────
+    if (path === '/storefront/checkout' && method === 'POST') {
+      return handleStorefrontCheckout(request, env);
+    }
+
+    // ── Product routes (all require merchant auth) ─────────────────
     if (path.startsWith('/products')) {
       const session = await requireAuth(request, env);
       if (session instanceof Response) return session;
@@ -98,6 +109,25 @@ export default {
       if (path.match(/^\/products\/[^/]+\/images$/) && method === 'POST') {
         const productId = path.split('/')[2];
         return handleUploadProductImage(request, env, tenantId, productId);
+      }
+    }
+
+    // ── Order routes (all require merchant auth) ───────────────────
+    if (path.startsWith('/orders')) {
+      const session = await requireAuth(request, env);
+      if (session instanceof Response) return session;
+      const { tenantId } = session;
+
+      if (path === '/orders' && method === 'GET') {
+        return handleListOrders(request, env, tenantId);
+      }
+      if (path.match(/^\/orders\/[^/]+$/) && method === 'GET') {
+        const orderId = path.split('/')[2];
+        return handleGetOrder(request, env, tenantId, orderId);
+      }
+      if (path.match(/^\/orders\/[^/]+\/status$/) && method === 'PATCH') {
+        const orderId = path.split('/')[2];
+        return handleUpdateOrderStatus(request, env, tenantId, orderId);
       }
     }
 
