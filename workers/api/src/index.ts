@@ -32,6 +32,12 @@ import {
   handleStorefrontListProducts,
   handleStorefrontGetProduct,
 } from './handlers/storefront';
+import {
+  handleGetSettings,
+  handleUpdateStoreSettings,
+  handleUpdateDomainSettings,
+  handleDeleteAccount,
+} from './handlers/settings';
 import { requireAuth } from './lib/auth';
 
 export default {
@@ -140,6 +146,31 @@ export default {
         const orderId = path.split('/')[2];
         return handleUpdateOrderStatus(request, env, tenantId, orderId);
       }
+    }
+
+    // ── Settings routes (all require merchant auth) ─────────────────
+    if (path.startsWith('/settings')) {
+      const session = await requireAuth(request, env);
+      if (session instanceof Response) return session;
+      const { tenantId } = session;
+
+      if (path === '/settings' && method === 'GET') {
+        return handleGetSettings(request, env, tenantId);
+      }
+      if (path === '/settings/store' && method === 'PATCH') {
+        return handleUpdateStoreSettings(request, env, tenantId);
+      }
+      if (path === '/settings/domain' && method === 'PATCH') {
+        return handleUpdateDomainSettings(request, env, tenantId);
+      }
+    }
+
+    // ── Account routes (requires merchant auth) ──────────────────────
+    if (path === '/account' && method === 'DELETE') {
+      const session = await requireAuth(request, env);
+      if (session instanceof Response) return session;
+      const { tenantId } = session;
+      return handleDeleteAccount(request, env, tenantId);
     }
 
     // ── 404 ───────────────────────────────────────────────────────

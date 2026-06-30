@@ -16,7 +16,7 @@
  *
  * Tenant resolution order:
  *   1. X-Dev-Host header (dev only — simulates subdomain without DNS)
- *   2. Custom domain → global:tenant_domain:{hostname}
+ *   2. Custom domain → global:tenant_domain:{hostname} (must be VERIFIED)
  *   3. Subdomain slug → global:tenant_slug:{slug}
  *
  * Security:
@@ -24,9 +24,17 @@
  *   - Tenant ID passed to API worker via X-Tenant-Id header (internal only)
  *   - X-Tenant-Id set by router and cannot be spoofed by clients
  *     (router strips any incoming X-Tenant-Id before forwarding)
+ *   - Custom domains only resolve once customDomainVerified is true —
+ *     storing a domain (via /settings/domain) never makes it live on
+ *     its own. Verification is a separate process (not yet built —
+ *     see handoff notes). Until verification exists, all custom
+ *     domains will 404 here by design; this is the safe default.
+ *   - Reserved subdomain list is imported from @solostore/shared so
+ *     it stays in sync with the slug validation used at signup/settings
+ *     time — previously this list was duplicated and had drifted.
  */
 
-import { kvKey, type TenantMeta } from '@solostore/shared';
+import { kvKey, type TenantMeta, isReservedSlug } from '@solostore/shared';
 
 // ─── Env ─────────────────────────────────────────────────────────────────────
 
@@ -78,10 +86,21 @@ async function resolveTenant(
   if (!hostname) return null;
 
   // ── 1. Custom domain lookup ───────────────────────────────────────────────
+  // A domain mapping existing in KV is NOT sufficient on its own — it must
+  // also be verified. This prevents unverified/unowned domains from ever
+  // serving real traffic, even if a merchant manages to point DNS at us
+  // before ownership is confirmed.
   const domainTenantId = await kv.get(kvKey.tenantByDomain(hostname));
   if (domainTenantId) {
     const tenant = await kv.get<TenantMeta>(kvKey.tenant(domainTenantId), 'json');
-    if (tenant) return tenant;
+    if (tenant && tenant.customDomainVerified === true) {
+      return tenant;
+    }
+    // Domain mapping exists but is unverified (or tenant record missing) —
+    // do NOT fall through to treating this as a valid request. Fail closed.
+    if (tenant && tenant.customDomainVerified !== true) {
+      return null;
+    }
   }
 
   // ── 2. Subdomain slug lookup ──────────────────────────────────────────────
@@ -89,9 +108,10 @@ async function resolveTenant(
   const parts = hostname.split('.');
   const slug = parts[0];
 
-  // Must have at least two parts and not be a reserved subdomain
-  const reserved = ['www', 'app', 'api', 'admin', 'mail', 'ftp'];
-  if (parts.length >= 2 && slug && !reserved.includes(slug)) {
+  // Must have at least two parts and not be a reserved subdomain.
+  // Reserved list is shared with slug validation (packages/shared) so
+  // the router and the settings API can never disagree on what's reserved.
+  if (parts.length >= 2 && slug && !isReservedSlug(slug)) {
     const slugTenantId = await kv.get(kvKey.tenantBySlug(slug));
     if (slugTenantId) {
       const tenant = await kv.get<TenantMeta>(kvKey.tenant(slugTenantId), 'json');

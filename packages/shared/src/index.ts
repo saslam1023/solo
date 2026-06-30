@@ -9,16 +9,20 @@ export type TenantStatus =
   | 'pending_connect'
   | 'pending_products'
   | 'ready'
-  | 'live';
+  | 'live'
+  | 'closed';
 
 export interface TenantMeta {
   id: string;                  // e.g. "tenant_abc123"
   slug?: string;               // set during onboarding
+  displayName?: string;        // cosmetic, buyer-facing store name
   customDomain?: string;       // optional, set later
+  customDomainVerified?: boolean; // true once DNS/SSL verified (Cloudflare for SaaS)
   stripeCustomerId: string;    // platform subscription identity
   stripeAccountId?: string;    // Connect Express — set after onboarding
   status: TenantStatus;
   createdAt: number;           // Unix ms
+  closedAt?: number;           // Unix ms — set on soft delete
 }
 
 // ─── Session ─────────────────────────────────────────────────────────────────
@@ -196,4 +200,57 @@ export function generateId(prefix: string): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
   return `${prefix}_${hex}`;
+}
+
+// ─── Slug Validation ──────────────────────────────────────────────────────────
+//
+// Used by settings handler when a merchant changes their slug.
+// Kept here (not in handler) so router and any future tooling can reuse it.
+
+const RESERVED_SLUGS = new Set([
+  'www', 'app', 'api', 'admin', 'router', 'cdn', 'assets',
+  'mail', 'email', 'webhooks', 'webhook', 'stripe', 'connect',
+  'support', 'help', 'status', 'blog', 'docs', 'static', 'storefront',
+]);
+
+const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/;
+
+export function isValidSlug(slug: string): boolean {
+  if (typeof slug !== 'string') return false;
+  if (slug.length < 3 || slug.length > 63) return false;
+  if (!SLUG_PATTERN.test(slug)) return false;
+  if (RESERVED_SLUGS.has(slug)) return false;
+  return true;
+}
+
+// Standalone reserved-word check — used by the router, which checks
+// an already-extracted subdomain segment against the reserved list
+// directly, without re-running full slug shape validation.
+export function isReservedSlug(slug: string): boolean {
+  return RESERVED_SLUGS.has(slug);
+}
+
+// ─── Custom Domain Validation ──────────────────────────────────────────────────
+//
+// Format-only validation. No DNS lookups here — verification is a separate,
+// asynchronous step (Cloudflare for SaaS custom hostname flow). Storing a
+// domain never makes it live; customDomainVerified gates routing.
+
+const DOMAIN_PATTERN = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})+$/;
+const PLATFORM_DOMAIN = 'headorn.com';
+
+export function isValidCustomDomain(domain: string): boolean {
+  if (typeof domain !== 'string') return false;
+  const normalised = domain.trim().toLowerCase();
+  if (normalised.length < 4 || normalised.length > 253) return false;
+  if (!DOMAIN_PATTERN.test(normalised)) return false;
+  // Block the platform's own domain and any subdomain of it —
+  // custom domains must be genuinely external, otherwise a merchant
+  // could attempt to spoof another tenant's subdomain.
+  if (normalised === PLATFORM_DOMAIN || normalised.endsWith(`.${PLATFORM_DOMAIN}`)) {
+    return false;
+  }
+  // Block raw IP-looking strings (basic check — not exhaustive)
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(normalised)) return false;
+  return true;
 }
