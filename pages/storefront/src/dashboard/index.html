@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Store dashboard — SoloStore</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<!-- ══════════════════════════════════════════════
+     APP SHELL — shared across all dashboard pages
+     (Products and Orders sections are placeholders here;
+     each becomes its own fully-wired page in later phases)
+══════════════════════════════════════════════ -->
+<div class="dash-shell" id="dash-shell" hidden>
+
+  <header class="topbar">
+    <div class="topbar-logo">Store dashboard</div>
+    <div class="topbar-right">
+      <a class="btn" id="view-store-link" href="#" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/></svg>
+        View store
+      </a>
+      <button class="btn btn-danger" id="logout-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs" aria-label="Dashboard sections">
+    <button class="nav-tab active" type="button" data-section="settings" aria-current="page">
+      <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
+    <button class="nav-tab" type="button" data-section="products" disabled aria-disabled="true" title="Coming next — built in Phase 10b">
+      <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Products
+    </button>
+    <button class="nav-tab" type="button" data-section="orders" disabled aria-disabled="true" title="Coming next — built in Phase 10c">
+      <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+      Orders
+    </button>
+  </nav>
+
+  <main class="content" id="main">
+
+    <!-- ══════════════════════════════════════════════
+         SETTINGS SECTION
+    ══════════════════════════════════════════════ -->
+    <div class="section active" id="section-settings">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Settings</h1>
+          <p class="section-sub">Your store's configuration</p>
+        </div>
+      </div>
+
+      <div id="settings-loading" class="loading-pulse">
+        <div class="pulse-card"></div>
+        <div class="pulse-card"></div>
+      </div>
+
+      <div id="settings-error" class="banner banner-error" role="alert" hidden></div>
+
+      <form id="settings-content" class="settings-sections" hidden>
+
+        <!-- Store identity -->
+        <section class="settings-group" aria-labelledby="group-store-title">
+          <div class="settings-group-header">
+            <h2 class="settings-group-title" id="group-store-title">Store identity</h2>
+          </div>
+          <div class="sf-body">
+            <div class="settings-field">
+              <label class="sf-label" for="f-display-name">
+                Store name
+                <span class="sf-sub">Shown to customers and in emails</span>
+              </label>
+              <input class="settings-input" id="f-display-name" type="text" maxlength="80" required>
+              <p class="field-error" id="err-display-name" role="alert" hidden></p>
+            </div>
+
+            <div class="settings-field">
+              <label class="sf-label" for="f-slug">
+                Store address
+                <span class="sf-sub">Your storefront's web address — changing this changes your store's URL immediately</span>
+              </label>
+              <div class="slug-input-row">
+                <span class="slug-prefix" aria-hidden="true">https://</span>
+                <input class="settings-input slug-input" id="f-slug" type="text" maxlength="63" pattern="[a-z0-9-]{3,63}" required aria-describedby="slug-suffix-hint">
+                <span class="slug-suffix" id="slug-suffix-hint">.headorn.com</span>
+              </div>
+              <p class="field-hint">3–63 lowercase letters, numbers, or hyphens. No spaces.</p>
+              <p class="field-error" id="err-slug" role="alert" hidden></p>
+            </div>
+
+            <button class="btn btn-primary" type="submit" id="save-store-btn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save store details
+            </button>
+            <p class="field-status" id="store-save-status" role="status" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- Custom domain -->
+        <section class="settings-group" aria-labelledby="group-domain-title">
+          <div class="settings-group-header">
+            <h2 class="settings-group-title" id="group-domain-title">Custom domain</h2>
+          </div>
+          <div class="sf-body">
+            <div class="settings-field">
+              <label class="sf-label" for="f-domain">
+                Your own domain
+                <span class="sf-sub">Optional — point your own domain at your store instead of using the address above</span>
+              </label>
+              <input class="settings-input" id="f-domain" type="text" placeholder="shop.yourbrand.com">
+              <p class="field-error" id="err-domain" role="alert" hidden></p>
+            </div>
+
+            <div class="banner banner-info" id="domain-status-banner" hidden></div>
+
+            <div class="domain-actions">
+              <button class="btn btn-primary" type="button" id="save-domain-btn">Save domain</button>
+              <button class="btn btn-secondary" type="button" id="remove-domain-btn" hidden>Remove domain</button>
+            </div>
+            <p class="field-status" id="domain-save-status" role="status" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- Account status -->
+        <section class="settings-group" aria-labelledby="group-status-title">
+          <div class="settings-group-header">
+            <h2 class="settings-group-title" id="group-status-title">Account status</h2>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Store status</div>
+              <div class="settings-row-sub">The current state of your store</div>
+            </div>
+            <div><span class="status-pill" id="status-pill">—</span></div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Payments</div>
+              <div class="settings-row-sub">Whether Stripe Connect is linked to your store</div>
+            </div>
+            <div><span class="status-pill" id="connect-pill">—</span></div>
+          </div>
+        </section>
+
+        <!-- Danger zone -->
+        <section class="settings-group settings-group-danger" aria-labelledby="group-danger-title">
+          <div class="settings-group-header">
+            <h2 class="settings-group-title" id="group-danger-title">Close account</h2>
+          </div>
+          <div class="sf-body">
+            <p class="field-hint">
+              This permanently closes your store. Your subscription is cancelled with Stripe and your store stops being reachable immediately. This cannot be undone.
+            </p>
+            <button class="btn btn-danger" type="button" id="open-close-account-btn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Close my account
+            </button>
+          </div>
+        </section>
+
+      </form>
+    </div>
+
+    <!-- Placeholder sections — wired in later phases -->
+    <div class="section" id="section-products">
+      <p class="field-hint">Products will be built next, in Phase 10b.</p>
+    </div>
+    <div class="section" id="section-orders">
+      <p class="field-hint">Orders will be built after Products, in Phase 10c.</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     LOGIN GATE — shown while checking session,
+     or if the session check fails
+══════════════════════════════════════════════ -->
+<div class="auth-gate" id="auth-gate">
+  <div class="auth-gate-card">
+    <p id="auth-gate-message">Checking your session…</p>
+    <a href="/login" class="btn btn-primary" id="auth-gate-login-link" hidden>Go to login</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ACCOUNT CLOSURE MODAL — typed-confirmation
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="close-account-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="close-modal-title">
+    <div class="modal-header">
+      <h2 class="modal-title" id="close-modal-title">Close your account</h2>
+      <button class="modal-close" type="button" id="close-modal-x" aria-label="Cancel and close this dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p>This will:</p>
+      <ul class="modal-list">
+        <li>Cancel your subscription with Stripe — you will not be charged again</li>
+        <li>Take your store offline immediately</li>
+        <li>Permanently close your account — this cannot be reversed</li>
+      </ul>
+      <p>
+        To confirm, type your store address (<strong id="close-confirm-slug">—</strong>) below.
+      </p>
+      <label class="sf-label" for="close-confirm-input">
+        Store address
+        <span class="sf-sub">Must match exactly</span>
+      </label>
+      <input class="settings-input" id="close-confirm-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="field-error" id="close-confirm-error" role="alert" hidden></p>
+      <div class="banner banner-error" id="close-account-error" role="alert" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="close-modal-cancel">Cancel</button>
+      <button class="btn btn-danger" type="button" id="close-modal-confirm" disabled>
+        Permanently close account
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" aria-live="polite" aria-atomic="true" role="status"></div>
+
+<script src="js/dashboard.js"></script>
+</body>
+</html>
