@@ -40,7 +40,7 @@
       <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
     </button>
-    <button class="nav-tab" type="button" data-section="products" disabled aria-disabled="true" title="Coming next — built in Phase 10b">
+    <button class="nav-tab" type="button" data-section="products">
       <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
       Products
     </button>
@@ -174,10 +174,37 @@
       </form>
     </div>
 
-    <!-- Placeholder sections — wired in later phases -->
+    <!-- ══════════════════════════════════════════════
+         PRODUCTS SECTION
+    ══════════════════════════════════════════════ -->
     <div class="section" id="section-products">
-      <p class="field-hint">Products will be built next, in Phase 10b.</p>
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Products</h1>
+          <p class="section-sub">What your store sells</p>
+        </div>
+        <button class="btn btn-primary" type="button" id="add-product-btn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add product
+        </button>
+      </div>
+
+      <div id="products-limit-banner" class="banner banner-info" role="status" hidden></div>
+      <div id="products-error" class="banner banner-error" role="alert" hidden></div>
+
+      <div id="products-loading" class="loading-pulse">
+        <div class="pulse-card"></div>
+        <div class="pulse-card"></div>
+      </div>
+
+      <p id="products-empty" class="field-hint" hidden>You haven't added any products yet.</p>
+
+      <div id="products-list" class="products-list" hidden></div>
     </div>
+
+    <!-- ══════════════════════════════════════════════
+         ORDERS SECTION — wired in Phase 10c
+    ══════════════════════════════════════════════ -->
     <div class="section" id="section-orders">
       <p class="field-hint">Orders will be built after Products, in Phase 10c.</p>
     </div>
@@ -230,6 +257,111 @@
       <button class="btn btn-danger" type="button" id="close-modal-confirm" disabled>
         Permanently close account
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ADD / EDIT PRODUCT MODAL
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="product-modal" hidden>
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="product-modal-title">
+    <div class="modal-header">
+      <h2 class="modal-title" id="product-modal-title">Add product</h2>
+      <button class="modal-close" type="button" id="product-modal-x" aria-label="Cancel and close this dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form class="modal-body" id="product-form">
+      <div class="banner banner-error" id="product-form-error" role="alert" hidden></div>
+
+      <div class="settings-field">
+        <label class="sf-label" for="pf-name">Product name</label>
+        <input class="settings-input" id="pf-name" type="text" maxlength="120" required>
+        <p class="field-error" id="pf-err-name" role="alert" hidden></p>
+      </div>
+
+      <div class="settings-field">
+        <label class="sf-label" for="pf-description">Description</label>
+        <textarea class="settings-input" id="pf-description" rows="3" required></textarea>
+        <p class="field-error" id="pf-err-description" role="alert" hidden></p>
+      </div>
+
+      <fieldset class="settings-field" id="pf-type-fieldset">
+        <legend class="sf-label">Type</legend>
+        <div class="radio-row">
+          <label class="radio-option">
+            <input type="radio" name="pf-type" value="physical" checked>
+            Physical — shipped to the buyer
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="pf-type" value="digital">
+            Digital — delivered electronically
+          </label>
+        </div>
+        <p class="field-hint" id="pf-type-locked-hint" hidden>Type cannot be changed after a product is created.</p>
+      </fieldset>
+
+      <div class="settings-field">
+        <label class="sf-label" for="pf-materials">
+          Materials
+          <span class="sf-sub">Optional, comma-separated</span>
+        </label>
+        <input class="settings-input" id="pf-materials" type="text" placeholder="e.g. cotton, oak">
+      </div>
+
+      <div class="settings-field">
+        <label class="sf-label" for="pf-tags">
+          Tags
+          <span class="sf-sub">Optional, comma-separated</span>
+        </label>
+        <input class="settings-input" id="pf-tags" type="text" placeholder="e.g. handmade, gift">
+      </div>
+
+      <!-- Variants — only shown when creating a new product. Existing
+           variants are edited inline in the product card, since the
+           backend has no "add variant to existing product" route. -->
+      <div class="settings-field" id="pf-variants-section">
+        <div class="variants-section-header">
+          <label class="sf-label" id="pf-variants-label">
+            Variants
+            <span class="sf-sub">At least one required — e.g. different sizes or colours</span>
+          </label>
+          <button class="btn btn-secondary" type="button" id="pf-add-variant-btn">+ Add variant</button>
+        </div>
+        <div id="pf-variant-rows"></div>
+        <p class="field-error" id="pf-err-variants" role="alert" hidden></p>
+      </div>
+
+      <p class="field-status" id="product-form-status" role="status" aria-live="polite"></p>
+    </form>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="product-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" type="submit" form="product-form" id="product-modal-save">Save product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     GENERIC ARCHIVE-CONFIRM MODAL
+     Reused for both "archive product" and "archive variant" —
+     configured via JS before opening (title/body text/callback).
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="confirm-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+    <div class="modal-header">
+      <h2 class="modal-title" id="confirm-modal-title">Archive this item?</h2>
+      <button class="modal-close" type="button" id="confirm-modal-x" aria-label="Cancel and close this dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-modal-message">Are you sure?</p>
+      <div class="banner banner-error" id="confirm-modal-error" role="alert" hidden></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="confirm-modal-cancel">Cancel</button>
+      <button class="btn btn-danger" type="button" id="confirm-modal-confirm">Archive</button>
     </div>
   </div>
 </div>

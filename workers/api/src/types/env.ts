@@ -12,4 +12,5 @@ export interface Env {
   RESEND_FROM: string;
   API_BASE_URL: string;
   R2_PUBLIC_URL: string;
+  R2_DEV_URL: string;
 }

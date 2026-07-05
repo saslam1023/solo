@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "wrangler pages dev src",
-    "deploy": "wrangler pages deploy src --project-name solostore-storefront"
+    "dev": "wrangler pages dev src --compatibility-date=2024-05-29",
+    "deploy": "wrangler pages deploy src --project-name solostore-storefront --compatibility-date=2024-05-29"
   }
 }
