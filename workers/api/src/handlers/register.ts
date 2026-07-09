@@ -1,17 +1,22 @@
 /**
  * POST /register
  *
- * Accepts { email, slug } — validates both, creates a Stripe Customer with
- * metadata.tenantId set at creation time, then creates a Checkout Session for
+ * Accepts { email, slug } — validates both, checks slug availability,
+ * creates a Stripe Customer, then creates a Checkout Session for
  * the £180/year platform subscription.
  *
- * NO KV WRITES happen here. Payment must complete first. The webhook handler
- * (checkout.session.completed) is responsible for materialising the tenant in KV.
+ * Slug availability:
+ *   - Checked at registration time (best-effort, not a hard lock)
+ *   - If taken, returns 409 with up to 3 alternative suggestions
+ *   - A narrow race window exists between check and webhook write —
+ *     webhook re-checks and handles the collision (see handlePlatformCheckoutCompleted)
+ *   - Messaging surfaces this reality to the user before payment
  *
- * Drop into: workers/api/src/handlers/register.ts
+ * NO KV WRITES happen here. Payment must complete first.
+ * The webhook (checkout.session.completed) materialises the tenant in KV.
  */
 
-import { generateId } from "@solostore/shared";
+import { generateId, isValidSlug } from "@solostore/shared";
 import type { Env } from "../types/env";
 
 // ---------------------------------------------------------------------------
@@ -29,40 +34,6 @@ interface RegisterBody {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/**
- * Slugs: 3–32 lowercase alphanumeric + hyphens, no leading/trailing hyphen,
- * no consecutive hyphens. Reserved words are blocked to protect platform routes.
- */
-const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
-const SLUG_MIN = 3;
-const SLUG_MAX = 32;
-
-const RESERVED_SLUGS = new Set([
-  "www",
-  "app",
-  "api",
-  "admin",
-  "dashboard",
-  "auth",
-  "login",
-  "register",
-  "checkout",
-  "billing",
-  "webhook",
-  "webhooks",
-  "static",
-  "assets",
-  "health",
-  "status",
-  "support",
-  "help",
-  "docs",
-  "mail",
-  "smtp",
-  "ftp",
-  "cdn",
-]);
-
 function validateEmail(email: string): string | null {
   if (!email || typeof email !== "string") return "Email is required";
   const trimmed = email.trim().toLowerCase();
@@ -71,29 +42,45 @@ function validateEmail(email: string): string | null {
   return null;
 }
 
-function validateSlug(slug: string): string | null {
-  if (!slug || typeof slug !== "string") return "Store slug is required";
-  const lower = slug.toLowerCase();
-  if (lower.length < SLUG_MIN)
-    return `Slug must be at least ${SLUG_MIN} characters`;
-  if (lower.length > SLUG_MAX)
-    return `Slug must be at most ${SLUG_MAX} characters`;
-  if (!SLUG_RE.test(lower))
-    return "Slug may only contain lowercase letters, numbers, and hyphens, and may not start or end with a hyphen";
-  if (/--/.test(lower)) return "Slug may not contain consecutive hyphens";
-  if (RESERVED_SLUGS.has(lower)) return "That slug is reserved";
-  return null;
+// ---------------------------------------------------------------------------
+// Slug suggestion helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate up to 3 alternative slug suggestions when the requested one is taken.
+ * Tries: suffixes (-shop, -store, -hq), then numeric increments (2, 3, 4).
+ * Only returns suggestions that pass full slug validation.
+ */
+async function generateAlternatives(
+  slug: string,
+  env: Env
+): Promise<string[]> {
+  const candidates = [
+    `${slug}-shop`,
+    `${slug}-store`,
+    `${slug}-hq`,
+    `${slug}2`,
+    `${slug}3`,
+    `${slug}4`,
+  ];
+
+  const available: string[] = [];
+
+  for (const candidate of candidates) {
+    if (!isValidSlug(candidate)) continue;
+    const existing = await env.SOLOSTORE_KV.get(`global:tenant_slug:${candidate}`);
+    if (!existing) {
+      available.push(candidate);
+      if (available.length === 3) break;
+    }
+  }
+
+  return available;
 }
 
 // ---------------------------------------------------------------------------
 // Stripe helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Minimal typed wrappers around the Stripe REST API.
- * We call Stripe directly (fetch) rather than using the npm SDK because
- * Cloudflare Workers don't support all Node.js APIs the SDK depends on.
- */
 
 async function stripeRequest<T>(
   path: string,
@@ -139,10 +126,6 @@ interface StripeCheckoutSession {
   url: string;
 }
 
-/**
- * Look up an existing Stripe customer by email.
- * Returns the first match, or null if none exists.
- */
 async function findCustomerByEmail(
   email: string,
   apiKey: string
@@ -155,11 +138,6 @@ async function findCustomerByEmail(
   return list.data[0] ?? null;
 }
 
-/**
- * Create a new Stripe customer.
- * tenantId is stored in metadata at creation time so that all subsequent
- * webhook events carry the identifier without any KV lookup.
- */
 async function createCustomer(
   email: string,
   tenantId: string,
@@ -178,50 +156,38 @@ async function createCustomer(
   });
 }
 
-/**
- * Create a Stripe Checkout Session for the £180/year subscription.
- *
- * price_data is used instead of a pre-created Price ID so that the platform
- * price is defined in code (single source of truth) and requires no Stripe
- * dashboard setup. Switch to a hardcoded price ID once the product is stable.
- *
- * client_reference_id carries tenantId so the webhook can always recover it
- * even if metadata lookup fails (belt-and-suspenders).
- */
 async function createCheckoutSession(
   customerId: string,
   tenantId: string,
   slug: string,
   env: Env
 ): Promise<StripeCheckoutSession> {
-  const baseUrl =
+  // Platform domain — no hardcoded external domains
+  const platformBase =
     env.ENVIRONMENT === "production"
-      ? `https://${slug}.solostore.io`
-      : `http://localhost:8100`;
+      ? "https://platform.headorn.com"
+      : "http://localhost:8789";
 
   const body = new URLSearchParams({
     customer: customerId,
     mode: "subscription",
     client_reference_id: tenantId,
 
-    // Line item — £180/year platform subscription
     "line_items[0][price_data][currency]": "gbp",
     "line_items[0][price_data][product_data][name]": "SoloStore Platform",
     "line_items[0][price_data][product_data][description]":
       "Annual platform subscription — £180/year",
     "line_items[0][price_data][recurring][interval]": "year",
-    "line_items[0][price_data][unit_amount]": "18000", // 18000 pence = £180
+    "line_items[0][price_data][unit_amount]": "18000",
     "line_items[0][quantity]": "1",
 
-    // Redirect URLs
-    success_url: `${baseUrl}/auth/verify?session_id={CHECKOUT_SESSION_ID}&post_checkout=true`,
-    cancel_url: `${baseUrl}/register?cancelled=true`,
+    // After payment: verify endpoint mints session, redirects to platform.headorn.com/onboarding
+    success_url: `${platformBase}/pending`,  // static "check your email" page — real magic link sent by cron after webhook fires
+    cancel_url: `${platformBase}/?cancelled=true`,
 
-    // Metadata carried through to checkout.session.completed webhook
     "metadata[tenantId]": tenantId,
     "metadata[slug]": slug,
 
-    // Allow promotion codes for future discount campaigns
     allow_promotion_codes: "true",
   });
 
@@ -233,92 +199,104 @@ async function createCheckoutSession(
 }
 
 // ---------------------------------------------------------------------------
-// Handler
+// GET /register/check-slug?slug=xxx
+// Public availability check for live feedback in the signup form
+// ---------------------------------------------------------------------------
+
+export async function handleCheckSlug(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const url = new URL(request.url);
+  const slug = (url.searchParams.get("slug") ?? "").trim().toLowerCase();
+
+  if (!slug) {
+    return Response.json({ available: false, error: "slug is required" }, { status: 400 });
+  }
+
+  if (!isValidSlug(slug)) {
+    return Response.json({
+      available: false,
+      error: "Store names must be 3–63 characters, lowercase letters, numbers, and hyphens only.",
+    });
+  }
+
+  const existing = await env.SOLOSTORE_KV.get(`global:tenant_slug:${slug}`);
+
+  if (existing) {
+    const alternatives = await generateAlternatives(slug, env);
+    return Response.json({
+      available: false,
+      alternatives,
+    });
+  }
+
+  return Response.json({ available: true });
+}
+
+// ---------------------------------------------------------------------------
+// POST /register
 // ---------------------------------------------------------------------------
 
 export async function handleRegister(
   request: Request,
   env: Env
 ): Promise<Response> {
-  // ── Method guard ──────────────────────────────────────────────────────────
   if (request.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
 
-  // ── Parse body ────────────────────────────────────────────────────────────
   let body: RegisterBody;
   try {
     body = (await request.json()) as RegisterBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const email = (body.email ?? "").trim().toLowerCase();
   const slug = (body.slug ?? "").trim().toLowerCase();
 
-  // ── Validate ──────────────────────────────────────────────────────────────
+  // Validate email
   const emailErr = validateEmail(email);
   if (emailErr) {
-    return new Response(JSON.stringify({ error: emailErr }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json({ error: emailErr }, { status: 400 });
   }
 
-  const slugErr = validateSlug(slug);
-  if (slugErr) {
-    return new Response(JSON.stringify({ error: slugErr }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  // Validate slug format
+  if (!isValidSlug(slug)) {
+    return Response.json({
+      error: "Store names must be 3–63 characters, lowercase letters, numbers, and hyphens only. Cannot start or end with a hyphen.",
+    }, { status: 400 });
   }
 
-  // ── Slug uniqueness check (KV) ────────────────────────────────────────────
-  // We check KV even though the tenant isn't written yet, because a completed
-  // checkout may have already claimed this slug. This is a best-effort guard;
-  // the webhook handler is the authoritative write and must also check.
-  const existingTenantId = await env.SOLOSTORE_KV.get(
-    `global:tenant_slug:${slug}`
-  );
+  // Slug availability check (best-effort — not a hard lock)
+  const existingTenantId = await env.SOLOSTORE_KV.get(`global:tenant_slug:${slug}`);
   if (existingTenantId) {
-    return new Response(
-      JSON.stringify({ error: "That store slug is already taken" }),
-      { status: 409, headers: { "Content-Type": "application/json" } }
+    const alternatives = await generateAlternatives(slug, env);
+    return Response.json(
+      {
+        error: "That store name is already taken.",
+        alternatives,
+        // Tell the client the name wasn't available so it can offer a change step
+        slugTaken: true,
+      },
+      { status: 409 }
     );
   }
 
-  // ── Stripe customer resolution ────────────────────────────────────────────
-  // If the email already has a Stripe customer:
-  //   - Re-use it if it already has a tenantId (idempotent re-registration).
-  //   - Re-use it without a tenantId (new tenant for existing Stripe contact).
-  // This avoids duplicate customers and handles the "user registered then
-  // abandoned checkout" scenario gracefully.
-
+  // Stripe customer resolution
   let tenantId: string;
   let customerId: string;
 
   try {
-    const existingCustomer = await findCustomerByEmail(
-      email,
-      env.STRIPE_SECRET_KEY
-    );
+    const existingCustomer = await findCustomerByEmail(email, env.STRIPE_SECRET_KEY);
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
 
       if (existingCustomer.metadata.tenantId) {
-        // They already have a tenant — re-use the same tenantId so they can
-        // retry checkout without orphaning the previous registration attempt.
         tenantId = existingCustomer.metadata.tenantId;
       } else {
-        // Existing Stripe customer but no tenant yet — generate a fresh id
-        // and patch the customer metadata.
         tenantId = generateId("tenant");
         const patchBody = new URLSearchParams({
           "metadata[tenantId]": tenantId,
@@ -331,53 +309,35 @@ export async function handleRegister(
         });
       }
     } else {
-      // Brand new registrant — create customer with metadata embedded.
       tenantId = generateId("tenant");
-      const newCustomer = await createCustomer(
-        email,
-        tenantId,
-        slug,
-        env.STRIPE_SECRET_KEY
-      );
+      const newCustomer = await createCustomer(email, tenantId, slug, env.STRIPE_SECRET_KEY);
       customerId = newCustomer.id;
     }
   } catch (err) {
     console.error("[register] Stripe customer error:", err);
-    return new Response(
-      JSON.stringify({ error: "Failed to set up your account. Please try again." }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
+    return Response.json(
+      { error: "Failed to set up your account. Please try again." },
+      { status: 502 }
     );
   }
 
-  // ── Stripe Checkout Session ───────────────────────────────────────────────
+  // Create checkout session
   let checkoutUrl: string;
   try {
-    const session = await createCheckoutSession(
-      customerId,
-      tenantId,
-      slug,
-      env
-    );
+    const session = await createCheckoutSession(customerId, tenantId, slug, env);
     checkoutUrl = session.url;
   } catch (err) {
     console.error("[register] Checkout session error:", err);
-    return new Response(
-      JSON.stringify({ error: "Failed to create checkout. Please try again." }),
-      { status: 502, headers: { "Content-Type": "application/json" } }
+    return Response.json(
+      { error: "Failed to create checkout. Please try again." },
+      { status: 502 }
     );
   }
 
-  // ── Response ──────────────────────────────────────────────────────────────
-  // Return the checkout URL. The client redirects to Stripe-hosted checkout.
-  // No KV writes. No session. Nothing persisted until webhook confirms payment.
-  return new Response(
-    JSON.stringify({
-      checkoutUrl,
-      tenantId, // useful for the client to track state client-side if needed
-    }),
-    {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }
-  );
+  return Response.json({
+    checkoutUrl,
+    tenantId,
+    // Surface the race-condition caveat to the client so it can show appropriate messaging
+    notice: "Your store name has been checked and appears available. It will be confirmed once your payment is complete.",
+  });
 }

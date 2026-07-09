@@ -146,12 +146,17 @@ export async function handleConnectReturn(
     await env.SOLOSTORE_KV.put(kvKey.tenant(tenantId), JSON.stringify(updated));
   }
 
-  return json({
-    status: nextStatus,
-    detailsSubmitted: account.details_submitted,
-    chargesEnabled: account.charges_enabled,
-    payoutsEnabled: account.payouts_enabled,
-  });
+  const onboardingUrl =
+  env.ENVIRONMENT === 'production'
+    ? 'https://platform.headorn.com/onboarding'
+    : 'http://localhost:8789/onboarding';
+
+return new Response(null, {
+  status: 302,
+  headers: {
+    Location: onboardingUrl,
+  },
+});
 }
 
 // ── GET /connect/refresh ──────────────────────────────────────────────────────

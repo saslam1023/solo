@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SoloStore — Your store, your rules</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --c-black:        #0A0A0A;
+      --c-white:        #FAFAF8;
+      --c-offwhite:     #F2F0EB;
+      --c-warm-mid:     #E8E4DC;
+      --c-muted:        #595959;
+      --c-muted-on-dark:#B3B3B3;
+      --c-accent:       #C8A96E;
+      --c-accent-text:  #8A6D33;
+      --c-red:          #9B1C16;
+      --c-red-bg:       #FBEAE9;
+      --c-green:        #1E5631;
+      --c-green-bg:     #E8F3EC;
+      --c-border:       rgba(10,10,10,0.14);
+      --c-border-md:    rgba(10,10,10,0.24);
+      --font-display:   'DM Serif Display', Georgia, serif;
+      --font-body:      'DM Sans', system-ui, sans-serif;
+      --nav-h:          64px;
+      --tr:             0.18s ease;
+      --radius:         10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--font-body);
+      background: var(--c-offwhite);
+      color: var(--c-black);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+    input { font: inherit; color: inherit; }
+    a { color: inherit; text-decoration: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+
+    .skip-link {
+      position: absolute; top: -9999px; left: 1rem;
+      background: var(--c-black); color: var(--c-white);
+      padding: .6rem 1rem; font-size: .875rem; z-index: 999; border-radius: 4px;
+    }
+    .skip-link:focus { top: 1rem; }
+
+    :focus-visible { outline: 3px solid var(--c-accent-text); outline-offset: 2px; }
+
+    /* Nav */
+    .topbar {
+      height: var(--nav-h);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.5rem;
+      background: var(--c-white);
+      border-bottom: 1px solid var(--c-border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar-logo { font-family: var(--font-display); font-size: 1.25rem; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: .6rem 1rem; border-radius: 100px;
+      font-size: .8125rem; font-weight: 500; letter-spacing: .02em;
+      border: 1px solid var(--c-border-md);
+      background: var(--c-white); color: var(--c-black);
+      transition: background var(--tr), border-color var(--tr);
+    }
+    .btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .btn:hover { background: var(--c-offwhite); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: var(--c-black); color: var(--c-white); border-color: var(--c-black); }
+    .btn-primary:hover:not(:disabled) { background: #2A2A2A; }
+    .btn-full { width: 100%; justify-content: center; padding: .8rem 1rem; font-size: .9375rem; }
+
+    /* Hero */
+    .hero {
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 5rem 1.5rem 3rem;
+    }
+    .hero-eyebrow {
+      font-size: .75rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--c-accent-text); margin-bottom: 1.25rem;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      line-height: 1.1; color: var(--c-black);
+      max-width: 640px; margin-bottom: 1.25rem;
+    }
+    .hero-sub {
+      font-size: 1.0625rem; color: var(--c-muted);
+      max-width: 460px; line-height: 1.7; margin-bottom: 3rem;
+    }
+
+    /* Signup card */
+    .signup-card {
+      background: var(--c-white);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      width: 100%; max-width: 440px;
+      overflow: hidden;
+      text-align: left;
+    }
+    .signup-card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--c-border);
+    }
+    .signup-card-title { font-family: var(--font-display); font-size: 1.125rem; margin-bottom: .2rem; }
+    .signup-card-sub { font-size: .8125rem; color: var(--c-muted); }
+    .signup-card-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.125rem; }
+    .signup-card-footer {
+      padding: 1.25rem 1.5rem;
+      border-top: 1px solid var(--c-border);
+      display: flex; flex-direction: column; gap: .75rem;
+    }
+    .price-note { font-size: .75rem; color: var(--c-muted); text-align: center; }
+
+    /* Form fields — matching dashboard exactly */
+    .settings-field { display: flex; flex-direction: column; gap: .5rem; }
+    .sf-label { font-size: .875rem; font-weight: 500; display: flex; flex-direction: column; gap: .15rem; }
+    .sf-sub { font-size: .8125rem; font-weight: 400; color: var(--c-muted); }
+    .settings-input {
+      padding: .75rem .875rem;
+      border: 1px solid var(--c-border-md);
+      border-radius: 8px; background: var(--c-white);
+      font-size: .9375rem; width: 100%;
+      transition: border-color var(--tr);
+    }
+    .settings-input:focus { border-color: var(--c-black); outline: none; }
+    .settings-input[aria-invalid="true"] { border-color: var(--c-red); }
+
+    /* Slug row */
+    .slug-input-row {
+      display: flex; align-items: center;
+      border: 1px solid var(--c-border-md); border-radius: 8px; overflow: hidden;
+      transition: border-color var(--tr);
+    }
+    .slug-input-row:focus-within { border-color: var(--c-black); }
+    .slug-input-row.state-ok { border-color: var(--c-green); }
+    .slug-input-row.state-err { border-color: var(--c-red); }
+    .slug-prefix {
+      padding: .75rem .5rem .75rem .875rem;
+      font-size: .875rem; color: var(--c-muted);
+      background: var(--c-offwhite);
+      white-space: nowrap;
+      border-right: 1px solid var(--c-border);
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .slug-suffix {
+      padding: .75rem .875rem .75rem .25rem;
+      font-size: .875rem; color: var(--c-muted);
+      background: var(--c-offwhite);
+      white-space: nowrap;
+      border-left: 1px solid var(--c-border);
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .slug-input {
+      border: none; border-radius: 0;
+      flex: 1; min-width: 0;
+      padding: .75rem .5rem;
+      font-size: .9375rem; background: transparent;
+    }
+    .slug-input:focus { outline: none; }
+    .slug-indicator {
+      padding: 0 .875rem;
+      display: flex; align-items: center;
+      flex-shrink: 0;
+    }
+    .slug-indicator svg {
+      width: 15px; height: 15px; stroke: currentColor; fill: none;
+      stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .slug-indicator.ok { color: var(--c-green); }
+    .slug-indicator.err { color: var(--c-red); }
+
+    .field-hint { font-size: .8125rem; color: var(--c-muted); }
+    .field-error { font-size: .8125rem; color: var(--c-red); font-weight: 500; }
+    .field-error[hidden] { display: none; }
+
+    /* Banners */
+    .banner { padding: .875rem 1rem; border-radius: 8px; font-size: .8125rem; line-height: 1.5; }
+    .banner[hidden] { display: none; }
+    .banner-info { background: var(--c-offwhite); color: var(--c-black); border: 1px solid var(--c-border-md); }
+    .banner-error { background: var(--c-red-bg); color: var(--c-red); border: 1px solid var(--c-red); }
+    .banner-success { background: var(--c-green-bg); color: var(--c-green); border: 1px solid var(--c-green); }
+
+    /* Alternatives */
+    .alternatives-block { padding: .875rem 1rem; background: var(--c-offwhite); border: 1px solid var(--c-border-md); border-radius: 8px; }
+    .alternatives-block[hidden] { display: none; }
+    .alternatives-block p { font-size: .8125rem; color: var(--c-muted); font-weight: 500; margin-bottom: .625rem; }
+    .alt-list { display: flex; flex-wrap: wrap; gap: .375rem; }
+    .alt-btn {
+      padding: .35rem .75rem;
+      border: 1px solid var(--c-border-md); border-radius: 100px;
+      font-size: .8125rem; background: var(--c-white); color: var(--c-black);
+      transition: background var(--tr);
+    }
+    .alt-btn:hover { background: var(--c-warm-mid); }
+
+    /* Spinner */
+    .btn-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: none; flex-shrink: 0;
+    }
+    .btn-spinner.visible { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Success state */
+    .success-state { padding: 2.5rem 1.5rem; text-align: center; display: none; }
+    .success-state.visible { display: block; }
+    .success-icon {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--c-green-bg);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.25rem;
+    }
+    .success-icon svg { width: 22px; height: 22px; stroke: var(--c-green); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .success-state h2 { font-family: var(--font-display); font-size: 1.25rem; margin-bottom: .5rem; }
+    .success-state p { font-size: .875rem; color: var(--c-muted); line-height: 1.6; }
+
+    /* Features */
+    .features { border-top: 1px solid var(--c-border); background: var(--c-white); padding: 3rem 1.5rem; }
+    .features-inner {
+      max-width: 800px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2rem;
+    }
+    .feature { display: flex; flex-direction: column; gap: .5rem; }
+    .feature-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--c-offwhite);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: .25rem;
+    }
+    .feature-icon svg { width: 18px; height: 18px; stroke: var(--c-accent-text); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .feature-label { font-size: .9375rem; font-weight: 600; }
+    .feature-desc { font-size: .8125rem; color: var(--c-muted); line-height: 1.5; }
+
+    /* Footer */
+    .site-footer { border-top: 1px solid var(--c-border); padding: 1.5rem; text-align: center; font-size: .8125rem; color: var(--c-muted); }
+    .site-footer a { color: var(--c-accent-text); font-weight: 500; text-decoration: underline; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(10,10,10,.6);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem; z-index: 400;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal { background: var(--c-white); border-radius: var(--radius); max-width: 400px; width: 100%; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--c-border); }
+    .modal-title { font-family: var(--font-display); font-size: 1.25rem; }
+    .modal-close { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background var(--tr); }
+    .modal-close:hover { background: var(--c-offwhite); }
+    .modal-close svg { width: 16px; height: 16px; stroke: var(--c-black); fill: none; stroke-width: 2; }
+    .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+    .modal-body p { font-size: .875rem; color: var(--c-muted); }
+    .modal-footer { display: flex; justify-content: flex-end; gap: .5rem; padding: 1.25rem 1.5rem; border-top: 1px solid var(--c-border); }
+
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 480px) {
+      .hero { padding: 3rem 1rem 2rem; }
+      .signup-card-body { padding: 1.25rem; }
+      .slug-prefix { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header>
+    <nav class="topbar" aria-label="Site navigation">
+      <span class="topbar-logo" aria-label="SoloStore">SoloStore</span>
+      <button class="btn" id="signin-trigger" aria-haspopup="dialog">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+        Sign in
+      </button>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <section class="hero" aria-labelledby="hero-heading">
+      <p class="hero-eyebrow" aria-hidden="true">Built for independent sellers</p>
+      <h1 id="hero-heading">Your store.<br>Your rules.</h1>
+      <p class="hero-sub">Launch your own online store in minutes. Your own address, your own brand, payouts straight to your bank. £180 a year — nothing else.</p>
+
+      <div class="signup-card" role="region" aria-label="Create your store">
+
+        <div class="success-state" id="success-state" aria-live="polite" aria-atomic="true">
+          <div class="success-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h2>Heading to checkout</h2>
+          <p>Redirecting you to complete payment. Once done, we'll send a sign-in link to your email to finish setting up your store.</p>
+        </div>
+
+        <div id="signup-form">
+          <div class="signup-card-header">
+            <p class="signup-card-title">Create your store</p>
+            <p class="signup-card-sub">Choose your store name — it becomes your web address.</p>
+          </div>
+
+          <div class="signup-card-body">
+            <div class="banner banner-error" id="form-error" hidden role="alert"></div>
+            <div class="banner banner-info" id="cancelled-notice" hidden role="status">Payment was cancelled — your store name is still available. Try again whenever you're ready.</div>
+
+            <div class="settings-field">
+              <label class="sf-label" for="email">
+                Email address
+                <span class="sf-sub">We'll send your sign-in link here</span>
+              </label>
+              <input class="settings-input" type="email" id="email" name="email" autocomplete="email" placeholder="you@example.com" aria-describedby="email-error" aria-required="true" />
+              <p class="field-error" id="email-error" hidden role="alert"></p>
+            </div>
+
+            <div class="settings-field">
+              <label class="sf-label" for="slug">
+                Store name
+                <span class="sf-sub">Lowercase letters, numbers, hyphens only</span>
+              </label>
+              <div class="slug-input-row" id="slug-wrap">
+                
+                <input class="slug-input" type="text" id="slug" name="slug" autocomplete="off" spellcheck="false" placeholder="sunny-ceramics" aria-describedby="slug-hint slug-error slug-live-status" aria-required="true" />
+                <span class="slug-suffix" aria-hidden="true">.headorn.com</span><span class="slug-indicator" id="slug-indicator" aria-hidden="true"></span>
+              </div>
+              <p class="field-hint" id="slug-hint">Your store will be at <strong><span id="slug-preview">yourname</span>.headorn.com</strong></p>
+              <p class="field-error" id="slug-error" hidden role="alert"></p>
+              <p class="visually-hidden" id="slug-live-status" aria-live="polite" aria-atomic="true"></p>
+            </div>
+
+            <div class="alternatives-block" id="alternatives-block" hidden>
+              <p>That name is taken — how about one of these?</p>
+              <div class="alt-list" id="alt-list" role="list"></div>
+            </div>
+
+            <div class="banner banner-info" id="availability-notice">
+              Your store name is checked now, but only confirmed when payment completes. In the rare case it's taken by then, you can rename for free in your dashboard.
+            </div>
+          </div>
+
+          <div class="signup-card-footer">
+            <button class="btn btn-primary btn-full" id="submit-btn" type="button">
+              <span class="btn-spinner" id="spinner" aria-hidden="true"></span>
+              <span id="btn-label">Continue to payment</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-left:2px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+            <p class="price-note">£180 / year &nbsp;·&nbsp; Cancel any time &nbsp;·&nbsp; No hidden fees</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="features" aria-label="Platform features">
+      <div class="features-inner">
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <p class="feature-label">Your own address</p>
+          <p class="feature-desc">yourname.headorn.com — your own address. Bring your own domain later.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <p class="feature-label">Payouts to your bank</p>
+          <p class="feature-desc">Stripe Connect — money goes directly to you, every time.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <p class="feature-label">Physical and digital</p>
+          <p class="feature-desc">Sell products, prints, downloads — anything you make.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <p class="feature-label">Secure by default</p>
+          <p class="feature-desc">No passwords. Magic-link sign in only — nothing to forget or leak.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>Already have a store? <a href="#" id="signin-trigger-2">Sign in</a></p>
+  </footer>
+
+  <!-- Sign-in modal -->
+  <div class="modal-backdrop" id="signin-modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Sign in to your store</h2>
+        <button class="modal-close" id="modal-close" aria-label="Close">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Enter your email and we'll send a sign-in link. No password needed.</p>
+        <div class="banner banner-error" id="modal-error" hidden role="alert"></div>
+        <div class="banner banner-success" id="modal-success" hidden role="status">Link sent — check your email. It expires in 15 minutes.</div>
+        <div class="settings-field" id="modal-field">
+          <label class="sf-label" for="signin-email">Email address</label>
+          <input class="settings-input" type="email" id="signin-email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+      </div>
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn" id="modal-cancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="signin-btn" type="button">
+          <span class="btn-spinner" id="signin-spinner" aria-hidden="true"></span>
+          <span id="signin-label">Send sign-in link</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const API = 'http://localhost:8787';
+
+  if (new URLSearchParams(window.location.search).get('cancelled') === 'true') {
+    document.getElementById('cancelled-notice').hidden = false;
+  }
+
+  // Slug check
+  const slugInput    = document.getElementById('slug');
+  const slugWrap     = document.getElementById('slug-wrap');
+  const slugIndicator= document.getElementById('slug-indicator');
+  const slugError    = document.getElementById('slug-error');
+  const slugLive     = document.getElementById('slug-live-status');
+  const altBlock     = document.getElementById('alternatives-block');
+  const altList      = document.getElementById('alt-list');
+  let slugAvailable  = false;
+  let debounce       = null;
+
+  const ICON_OK = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  const ICON_X  = '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+  function setSlug(state, msg) {
+    slugWrap.classList.remove('state-ok','state-err');
+    slugIndicator.classList.remove('ok','err');
+    slugIndicator.innerHTML = '';
+    slugError.hidden = true;
+    altBlock.hidden  = true;
+    slugAvailable    = false;
+    if (state === 'ok') {
+      slugWrap.classList.add('state-ok');
+      slugIndicator.classList.add('ok');
+      slugIndicator.innerHTML = ICON_OK;
+      slugLive.textContent = 'Store name available';
+      slugAvailable = true;
+    } else if (state === 'err') {
+      slugWrap.classList.add('state-err');
+      slugIndicator.classList.add('err');
+      slugIndicator.innerHTML = ICON_X;
+      slugError.textContent = msg;
+      slugError.hidden = false;
+      slugLive.textContent = msg;
+    } else if (state === 'checking') {
+      slugLive.textContent = 'Checking availability…';
+    } else {
+      slugLive.textContent = '';
+    }
+  }
+
+  function renderAlts(alts) {
+    if (!alts || !alts.length) return;
+    altList.innerHTML = '';
+    alts.forEach(alt => {
+      const btn = document.createElement('button');
+      btn.className = 'alt-btn';
+      btn.textContent = alt;
+      btn.setAttribute('aria-label', 'Use ' + alt);
+      btn.setAttribute('role', 'listitem');
+      btn.addEventListener('click', () => { slugInput.value = alt; altBlock.hidden = true; check(alt); });
+      altList.appendChild(btn);
+    });
+    altBlock.hidden = false;
+  }
+
+  async function check(val) {
+    if (!val || val.length < 3) { setSlug('idle'); return; }
+    setSlug('checking');
+    try {
+      const r = await fetch(API + '/register/check-slug?slug=' + encodeURIComponent(val));
+      const d = await r.json();
+      if (d.available) { setSlug('ok'); }
+      else if (d.error) { setSlug('err', d.error); }
+      else { setSlug('err', 'That name is already taken.'); renderAlts(d.alternatives); }
+    } catch { setSlug('idle'); }
+  }
+
+  const slugPreview = document.getElementById('slug-preview');
+
+  slugInput.addEventListener('input', () => {
+    const raw = slugInput.value;
+    const clean = raw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+    if (clean !== raw) slugInput.value = clean;
+    // Update live subdomain preview
+    slugPreview.textContent = clean || 'yourname';
+    setSlug('idle');
+    clearTimeout(debounce);
+    if (clean.length >= 3) debounce = setTimeout(() => check(clean), 420);
+  });
+
+  // Submit
+  const submitBtn = document.getElementById('submit-btn');
+  const spinner   = document.getElementById('spinner');
+  const btnLabel  = document.getElementById('btn-label');
+  const formError = document.getElementById('form-error');
+  const emailInput= document.getElementById('email');
+  const emailError= document.getElementById('email-error');
+
+  function setBusy(yes) {
+    submitBtn.disabled = yes;
+    submitBtn.setAttribute('aria-busy', yes);
+    spinner.classList.toggle('visible', yes);
+    btnLabel.textContent = yes ? 'Checking…' : 'Continue to payment';
+  }
+
+  submitBtn.addEventListener('click', async () => {
+    formError.hidden = true;
+    emailError.hidden = true;
+    const email = emailInput.value.trim();
+    const slug  = slugInput.value.trim();
+    if (!email || !email.includes('@')) {
+      emailError.textContent = 'A valid email address is required.';
+      emailError.hidden = false; emailInput.focus(); return;
+    }
+    if (!slug) { setSlug('err','A store name is required.'); slugInput.focus(); return; }
+    if (!slugAvailable) { setSlug('err','Please choose an available store name before continuing.'); slugInput.focus(); return; }
+    setBusy(true);
+    try {
+      const res  = await fetch(API + '/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,slug}) });
+      const data = await res.json();
+      if (res.status === 409 && data.slugTaken) { setSlug('err','That name was just taken.'); renderAlts(data.alternatives); setBusy(false); return; }
+      if (!res.ok) { formError.textContent = data.error || 'Something went wrong. Please try again.'; formError.hidden = false; setBusy(false); return; }
+      document.getElementById('success-state').classList.add('visible');
+      document.getElementById('signup-form').style.display = 'none';
+      window.location.href = data.checkoutUrl;
+    } catch {
+      formError.textContent = 'Could not reach the server. Check your connection and try again.';
+      formError.hidden = false; setBusy(false);
+    }
+  });
+
+  // Sign-in modal
+  const modal       = document.getElementById('signin-modal');
+  const signinEmail = document.getElementById('signin-email');
+  const signinBtn   = document.getElementById('signin-btn');
+  const signinSpinner = document.getElementById('signin-spinner');
+  const signinLabel = document.getElementById('signin-label');
+  const modalSuccess= document.getElementById('modal-success');
+  const modalError  = document.getElementById('modal-error');
+  const modalField  = document.getElementById('modal-field');
+  const modalFooter = document.getElementById('modal-footer');
+  let lastFocus = null;
+
+  function openModal() { lastFocus = document.activeElement; modal.hidden = false; signinEmail.focus(); }
+  function closeModal() {
+    modal.hidden = true;
+    modalError.hidden = true; modalSuccess.hidden = true;
+    modalField.style.display = ''; modalFooter.style.display = '';
+    signinEmail.value = ''; signinBtn.disabled = false;
+    signinSpinner.classList.remove('visible'); signinLabel.textContent = 'Send sign-in link';
+    if (lastFocus) lastFocus.focus();
+  }
+
+  document.getElementById('signin-trigger').addEventListener('click', openModal);
+  document.getElementById('signin-trigger-2').addEventListener('click', e => { e.preventDefault(); openModal(); });
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  modal.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  signinBtn.addEventListener('click', async () => {
+    modalError.hidden = true;
+    const email = signinEmail.value.trim();
+    if (!email || !email.includes('@')) { modalError.textContent = 'Enter a valid email address.'; modalError.hidden = false; return; }
+    signinBtn.disabled = true; signinSpinner.classList.add('visible'); signinLabel.textContent = 'Sending…';
+    try {
+      await fetch(API + '/auth/magic-link', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email}) });
+      modalField.style.display = 'none'; modalFooter.style.display = 'none'; modalSuccess.hidden = false;
+    } catch {
+      modalError.textContent = 'Could not send link. Please try again.'; modalError.hidden = false;
+      signinBtn.disabled = false; signinSpinner.classList.remove('visible'); signinLabel.textContent = 'Send sign-in link';
+    }
+  });
+</script>
+
+</body>
+</html>

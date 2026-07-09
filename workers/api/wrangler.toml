@@ -1,10 +1,12 @@
-#workers/api/wrangler.toml
-
+# workers/api/wrangler.toml
 
 name = "solostore-api"
 main = "src/index.ts"
 compatibility_date = "2024-05-29"
 compatibility_flags = ["nodejs_compat"]
+
+[dev]
+port = 8787
 
 [[kv_namespaces]]
 binding = "SOLOSTORE_KV"
@@ -18,8 +20,30 @@ preview_bucket_name = "solostore-assets-preview"
 
 [vars]
 ENVIRONMENT = "development"
+#API_BASE_URLS=http://localhost:8787
+API_BASE_URL="https://platform.headorn.com"
+RESEND_FROM = "SoloStore <onboarding@headorn.com>"
 
-# Secrets:
-#   SESSION_SECRET
+# Secrets — set via `wrangler secret put`:
 #   STRIPE_SECRET_KEY
+#   STRIPE_WEBHOOK_SECRET
+#   STRIPE_CONNECT_WEBHOOK_SECRET
 #   RESEND_API_KEY
+#   SESSION_SECRET
+#   R2_PUBLIC_URL   (set in .dev.vars for local — https://pub-xxx.r2.dev)
+
+[env.production]
+name = "solostore-api-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+API_BASE_URL = "https://api.headorn.com"
+RESEND_FROM = "SoloStore <onboarding@headorn.com>"
+
+[[env.production.kv_namespaces]]
+binding = "SOLOSTORE_KV"
+id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
+
+[[env.production.r2_buckets]]
+binding = "SOLOSTORE_R2"
+bucket_name = "solostore-assets"

@@ -45,6 +45,21 @@ export interface Env {
   API_BASE_URL: string;                   // e.g. https://api.headorn.com
 }
 
+
+// ---------------------------------------------------------------------------
+// HTML escaping
+// Prevents user-controlled values breaking email HTML
+// ---------------------------------------------------------------------------
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 // ---------------------------------------------------------------------------
 // Stripe signature verification
 // Web Crypto — no Node.js crypto required.
@@ -133,6 +148,10 @@ interface StripePlatformCheckoutSession {
   client_reference_id: string;
   metadata: Record<string, string>;
   subscription: string | null;
+  amount_total: number | null;
+  currency: string | null;
+  payment_status: string;
+  created: number;
 }
 
 // Connect checkout session (buyer purchase)
@@ -173,6 +192,22 @@ interface StripeAccount {
   };
 }
 
+function generateOrderReference(): string {
+  const date = new Date();
+
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+
+  const random = crypto
+    .randomUUID()
+    .replace(/-/g, "")
+    .slice(0, 5)
+    .toUpperCase();
+
+  return `SOLO-${yyyy}${mm}${dd}-${random}`;
+}
+
 // ---------------------------------------------------------------------------
 // Resend email helper
 // ---------------------------------------------------------------------------
@@ -185,6 +220,35 @@ async function sendMagicLink(opts: {
 }): Promise<void> {
   const { to, magicUrl, tenantSlug, env } = opts;
 
+
+  /*
+const allowedHosts =
+  env.ENVIRONMENT === "development"
+    ? [
+        "localhost",
+      "127.0.0.1",
+        "platform.headorn.com",
+        "api.headorn.com",
+        "api-staging.headorn.com",
+      ]
+    : [
+        "api.headorn.com",
+        "api-staging.headorn.com",
+      ];
+
+let apiHost: string;
+
+try {
+  apiHost = new URL(env.API_BASE_URL).hostname;
+} catch {
+  throw new Error("Invalid API_BASE_URL format");
+}
+
+if (!allowedHosts.includes(apiHost)) {
+  throw new Error(`Invalid API_BASE_URL host: ${apiHost}`);
+}
+*/
+  
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -202,10 +266,10 @@ async function sendMagicLink(opts: {
         <body style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;color:#1a1a1a;">
           <h1 style="font-size:24px;font-weight:700;margin-bottom:8px;">Welcome to SoloStore</h1>
           <p style="color:#555;margin-bottom:32px;">
-            Your store <strong>${tenantSlug}</strong> is ready. Click the button below to
+            Your store <strong>${escapeHtml(tenantSlug)}</strong> is ready. Click the button below to
             sign in to your dashboard and complete setup.
           </p>
-          <a href="${magicUrl}"
+          <a href="${escapeHtml(magicUrl)}"
              style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;
                     padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
             Sign in to your store →
@@ -216,12 +280,12 @@ async function sendMagicLink(opts: {
           </p>
           <p style="font-size:13px;color:#bbb;margin-top:8px;">
             Can't click? Copy this URL:<br>
-            <span style="word-break:break-all;">${magicUrl}</span>
+            <span style="word-break:break-all;">${escapeHtml(magicUrl)}</span>
           </p>
         </body>
         </html>
       `,
-      text: `Welcome to SoloStore\n\nYour store "${tenantSlug}" is ready.\n\nSign in here: ${magicUrl}\n\nThis link expires in 15 minutes.`,
+      text: `Welcome to SoloStore\n\nYour store "${escapeHtml(tenantSlug)}" is ready.\n\nSign in here: ${escapeHtml(magicUrl)}\n\nThis link expires in 15 minutes.`,
     }),
   });
 
@@ -229,6 +293,152 @@ async function sendMagicLink(opts: {
     const body = await res.text();
     throw new Error(`Resend error ${res.status}: ${body}`);
   }
+}
+
+
+async function sendPaymentConfirmation(opts: {
+  to: string;
+  slug: string;
+  session: StripePlatformCheckoutSession;
+  tenantId: string;
+  orderRef: string;
+  env: Env;
+}): Promise<void> {
+  const { to, slug, session, tenantId, orderRef, env } = opts;
+
+  const amount = session.amount_total
+    ? `£${(session.amount_total / 100).toFixed(2)}`
+    : "£180.00";
+
+  const paidDate = session.created
+    ? new Date(session.created * 1000).toUTCString()
+    : new Date().toUTCString();
+
+  const storeUrl = `${slug}.headorn.com`;
+
+  //const reference = session.id;
+  const reference = orderRef;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: env.RESEND_FROM,
+      to: [to],
+      subject: "Payment confirmed — your SoloStore is ready",
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+        </head>
+
+        <body style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;color:#1a1a1a;">
+
+          <h1 style="font-size:24px;font-weight:700;margin-bottom:8px;">
+            Payment confirmed ✓
+          </h1>
+
+          <p style="color:#555;line-height:1.6;">
+            Thanks for signing up for SoloStore. Your store subscription payment
+            has been successfully received.
+          </p>
+
+          <div style="
+            margin:32px 0;
+            padding:20px;
+            background:#f7f7f5;
+            border-radius:10px;
+            border:1px solid #e5e5e5;
+          ">
+
+            <h2 style="font-size:16px;margin:0 0 16px;">
+              Payment details
+            </h2>
+
+            <p style="margin:8px 0;font-size:14px;">
+              <strong>Store:</strong><br>
+              ${escapeHtml(storeUrl)}
+            </p>
+
+            <p style="margin:8px 0;font-size:14px;">
+              <strong>Plan:</strong><br>
+              SoloStore annual subscription
+            </p>
+
+            <p style="margin:8px 0;font-size:14px;">
+              <strong>Amount paid:</strong><br>
+              ${escapeHtml(amount)}
+            </p>
+
+            <p style="margin:8px 0;font-size:14px;">
+              <strong>Date:</strong><br>
+              ${escapeHtml(paidDate)}
+            </p>
+
+            <p style="margin:8px 0;font-size:14px;">
+              <strong>Payment reference:</strong><br>
+              ${escapeHtml(reference)}
+            </p>
+
+            <strong>Order reference:</strong><br>
+${escapeHtml(orderRef)}
+
+          </div>
+
+          <p style="color:#555;line-height:1.6;">
+            We've also sent you a separate email containing your magic sign-in link.
+            Use that link to access your dashboard and finish setting up your store.
+          </p>
+
+          <p style="margin-top:32px;font-size:13px;color:#888;">
+            If you have any questions, reply to this email and we'll help you out.
+          </p>
+
+          <p style="font-size:13px;color:#bbb;margin-top:16px;">
+            SoloStore
+          </p>
+
+        </body>
+        </html>
+      `,
+      text: `
+Payment confirmed — your SoloStore is ready
+
+Thanks for signing up.
+
+Store:
+${escapeHtml(storeUrl)}
+
+Plan:
+SoloStore annual subscription
+
+Amount paid:
+${escapeHtml(amount)}
+
+Date:
+${escapeHtml(paidDate)}
+
+Payment reference:
+${escapeHtml(reference)}
+Order reference:
+${escapeHtml(orderRef)}
+
+Your magic sign-in link has been sent separately.
+      `.trim(),
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Resend payment confirmation error ${res.status}: ${body}`);
+  }
+
+  console.log(`[email] Payment confirmation sent to ${to}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +454,9 @@ async function handlePlatformCheckoutCompleted(
     session.metadata.tenantId ?? session.client_reference_id ?? null;
 
   const slug = session.metadata.slug ?? null;
+
+  const orderRef = generateOrderReference();
+
 
   if (!tenantId) {
     const customer = await stripeGet<StripeCustomer>(
@@ -261,12 +474,31 @@ async function handlePlatformCheckoutCompleted(
     throw new Error(`[webhook] Cannot resolve slug from session ${session.id} (tenantId: ${tenantId})`);
   }
 
+    
+  
   // Idempotency guard
   const existing = await env.SOLOSTORE_KV.get(kvKey.tenant(tenantId));
   if (existing) {
-    console.log(`[webhook] Tenant ${tenantId} already exists — skipping duplicate write`);
+  console.log(`[webhook] Tenant exists — checking payment state`);
+
+  const payment = await env.SOLOSTORE_KV.get(`payment:${session.id}`);
+
+  if (payment) {
     return;
   }
+}
+
+  await env.SOLOSTORE_KV.put(
+  `payment:${session.id}`,
+  JSON.stringify({
+    orderRef,
+    tenantId,
+    amount: session.amount_total,
+    currency: session.currency,
+    createdAt: Date.now(),
+  })
+);
+
 
   // Slug uniqueness guard
   const existingTenantForSlug = await env.SOLOSTORE_KV.get(`global:tenant_slug:${slug}`);
@@ -285,6 +517,7 @@ async function handlePlatformCheckoutCompleted(
     createdAt: Date.now(),
   };
 
+  /* cron job on hold
   await Promise.all([
     env.SOLOSTORE_KV.put(kvKey.tenant(tenantId), JSON.stringify(tenantMeta)),
     env.SOLOSTORE_KV.put(`global:tenant_slug:${slug}`, tenantId),
@@ -294,6 +527,54 @@ async function handlePlatformCheckoutCompleted(
       { expirationTtl: 3600 }
     ),
   ]);
+  */
+  
+  await Promise.all([
+  env.SOLOSTORE_KV.put(kvKey.tenant(tenantId), JSON.stringify(tenantMeta)),
+  env.SOLOSTORE_KV.put(`global:tenant_slug:${slug}`, tenantId),
+  ]);
+  
+  const customer = await stripeGet<StripeCustomer>(
+  `/customers/${session.customer}`,
+  env.STRIPE_SECRET_KEY
+);
+
+if (!customer.email) {
+  throw new Error(`Customer ${session.customer} has no email`);
+}
+
+const token = generateId("tok");
+
+await env.SOLOSTORE_KV.put(
+  kvKey.magicToken(token),
+  JSON.stringify({ tenantId }),
+  { expirationTtl: 900 }
+);
+
+const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
+
+  try {
+    await sendMagicLink({
+      to: customer.email,
+      magicUrl,
+      tenantSlug: slug,
+      env,
+    });
+  } catch(err) {
+  await env.SOLOSTORE_KV.delete(kvKey.magicToken(token));
+  throw err;
+}
+  
+  await sendPaymentConfirmation({
+  to: customer.email,
+  slug,
+  session,
+  tenantId,
+  orderRef,
+  env,
+});
+
+console.log(`[webhook] Magic link sent immediately to ${customer.email}`);
 
   console.log(`[webhook] Tenant ${tenantId} (${slug}) created, status=${initialStatus}`);
 }

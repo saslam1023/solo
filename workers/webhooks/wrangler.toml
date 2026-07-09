@@ -4,7 +4,7 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [dev]
-port = 8788
+port = 8787
 
 [[kv_namespaces]]
 binding = "SOLOSTORE_KV"
@@ -17,7 +17,8 @@ crons = ["* * * * *"]
 [vars]
 ENVIRONMENT = "development"
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
-API_BASE_URL = "http://localhost:8787"
+API_BASE_URL="http://localhost:8787d"
+#API_BASE_URL="https://platform.headorn.com"
 
 # Secrets (set via `wrangler secret put`):
 #   STRIPE_SECRET_KEY

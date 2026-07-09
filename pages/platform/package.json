@@ -1,0 +1,14 @@
+{
+  "name": "@solostore/platform",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev src --compatibility-date=2024-05-29 --port 8789",
+    "deploy": "wrangler pages deploy src --project-name solostore-platform"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240529.0",
+    "typescript": "^5.4.5",
+    "wrangler": "^4.105.0"
+  }
+}

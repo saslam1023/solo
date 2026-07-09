@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Check your email — SoloStore</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --c-black:       #0A0A0A;
+      --c-white:       #FAFAF8;
+      --c-offwhite:    #F2F0EB;
+      --c-warm-mid:    #E8E4DC;
+      --c-muted:       #595959;
+      --c-accent-text: #8A6D33;
+      --c-green:       #1E5631;
+      --c-green-bg:    #E8F3EC;
+      --c-border:      rgba(10,10,10,0.14);
+      --c-border-md:   rgba(10,10,10,0.24);
+      --c-red:         #9B1C16;
+      --c-red-bg:      #FBEAE9;
+      --font-display:  'DM Serif Display', Georgia, serif;
+      --font-body:     'DM Sans', system-ui, sans-serif;
+      --radius:        10px;
+      --tr:            0.18s ease;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--font-body);
+      background: var(--c-offwhite);
+      color: var(--c-black);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+
+    :focus-visible { outline: 3px solid var(--c-accent-text); outline-offset: 2px; }
+
+    .card {
+      background: var(--c-white);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 440px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--c-border);
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .icon-wrap {
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      background: var(--c-green-bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .icon-wrap svg {
+      width: 20px; height: 20px;
+      stroke: var(--c-green); fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+    }
+
+    .card-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card-body p {
+      font-size: .9375rem;
+      color: var(--c-muted);
+      line-height: 1.6;
+    }
+
+    .card-body strong {
+      color: var(--c-black);
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+      padding: 1rem;
+      background: var(--c-offwhite);
+      border-radius: 8px;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      font-size: .875rem;
+      color: var(--c-muted);
+    }
+
+    .step-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--c-white);
+      border: 1px solid var(--c-border-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 600;
+      color: var(--c-black);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .card-footer {
+      padding: 1.25rem 1.5rem;
+      border-top: 1px solid var(--c-border);
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: .6rem 1rem; border-radius: 100px;
+      font-size: .8125rem; font-weight: 500; letter-spacing: .02em;
+      border: 1px solid var(--c-border-md);
+      background: var(--c-white); color: var(--c-black);
+      transition: background var(--tr);
+      cursor: pointer;
+      text-decoration: none;
+      justify-content: center;
+    }
+    .btn:hover { background: var(--c-offwhite); }
+
+    .resend-note {
+      font-size: .75rem;
+      color: var(--c-muted);
+      text-align: center;
+    }
+
+    .banner {
+      padding: .875rem 1rem;
+      border-radius: 8px;
+      font-size: .8125rem;
+      line-height: 1.5;
+    }
+    .banner[hidden] { display: none; }
+    .banner-success { background: var(--c-green-bg); color: var(--c-green); border: 1px solid var(--c-green); }
+    .banner-error { background: var(--c-red-bg); color: var(--c-red); border: 1px solid var(--c-red); }
+
+    .btn-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(10,10,10,0.2);
+      border-top-color: var(--c-black);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: none; flex-shrink: 0;
+    }
+    .btn-spinner.visible { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      color: var(--c-black);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <a href="/" class="logo">SoloStore</a>
+
+  <div class="card" role="main">
+
+    <div class="card-header">
+      <div class="icon-wrap" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      </div>
+      <h1 class="card-title">Check your email</h1>
+    </div>
+
+    <div class="card-body">
+
+      <p>Payment confirmed — thank you. We're setting up your store now and will email you a sign-in link within the next minute.</p>
+
+      <div class="steps" aria-label="What happens next">
+        <div class="step">
+          <span class="step-num" aria-hidden="true">1</span>
+          <span>Your store is being created in the background</span>
+        </div>
+        <div class="step">
+          <span class="step-num" aria-hidden="true">2</span>
+          <span>A sign-in link will arrive in your inbox — <strong>it expires in 15 minutes</strong></span>
+        </div>
+        <div class="step">
+          <span class="step-num" aria-hidden="true">3</span>
+          <span>Click the link to complete setup and connect your bank account</span>
+        </div>
+      </div>
+
+      <p>If you don't see the email within a couple of minutes, check your spam folder.</p>
+
+      <div class="banner banner-success" id="resend-success" hidden role="status">
+        Link resent — check your inbox.
+      </div>
+      <div class="banner banner-error" id="resend-error" hidden role="alert">
+        Could not resend. Please try signing in from the homepage.
+      </div>
+
+    </div>
+
+    <div class="card-footer">
+      <button class="btn" id="resend-btn" type="button">
+        <span class="btn-spinner" id="resend-spinner" aria-hidden="true"></span>
+        <span id="resend-label">Resend sign-in link</span>
+      </button>
+      <p class="resend-note">Already got the link? <a href="/" style="color:var(--c-accent-text);font-weight:500;">Back to homepage</a></p>
+    </div>
+
+  </div>
+
+<script>
+  const API = 'http://localhost:8787'; // dev — replace with https://api.headorn.com in prod
+
+  // Pull email from sessionStorage if the signup form stored it
+  // (index.html should store it before redirecting to Stripe)
+  const email = sessionStorage.getItem('solostore_signup_email') || '';
+
+  const resendBtn     = document.getElementById('resend-btn');
+  const resendSpinner = document.getElementById('resend-spinner');
+  const resendLabel   = document.getElementById('resend-label');
+  const resendSuccess = document.getElementById('resend-success');
+  const resendError   = document.getElementById('resend-error');
+
+  resendBtn.addEventListener('click', async () => {
+    if (!email) {
+      // No email stored — send them back to homepage to sign in properly
+      window.location.href = '/';
+      return;
+    }
+
+    resendBtn.disabled = true;
+    resendSpinner.classList.add('visible');
+    resendLabel.textContent = 'Sending…';
+    resendSuccess.hidden = true;
+    resendError.hidden = true;
+
+    try {
+      await fetch(`${API}/auth/magic-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      // Always show success — safe response
+      resendSuccess.hidden = false;
+      resendBtn.disabled = false;
+      resendSpinner.classList.remove('visible');
+      resendLabel.textContent = 'Resend sign-in link';
+    } catch {
+      resendError.hidden = false;
+      resendBtn.disabled = false;
+      resendSpinner.classList.remove('visible');
+      resendLabel.textContent = 'Resend sign-in link';
+    }
+  });
+</script>
+
+</body>
+</html>

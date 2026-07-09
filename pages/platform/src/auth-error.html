@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign-in error — SoloStore</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #fafaf8;
+      color: #0f0f0f;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e2e2;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+    p { font-size: 0.875rem; color: #666; line-height: 1.6; margin-bottom: 1.5rem; }
+    a {
+      display: inline-block;
+      padding: 0.7rem 1.5rem;
+      background: #1a1a2e;
+      color: #fff;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⚠️</div>
+    <h1 id="title">Sign-in link expired</h1>
+    <p id="msg">This link has expired or already been used. Sign-in links are valid for 15 minutes and can only be used once.</p>
+    <a href="/">Back to homepage</a>
+  </div>
+  <script>
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    if (reason === 'missing_token') {
+      document.getElementById('title').textContent = 'Invalid sign-in link';
+      document.getElementById('msg').textContent = 'This sign-in link is not valid. Please request a new one from the homepage.';
+    } else if (reason === 'tenant_not_found') {
+      document.getElementById('title').textContent = 'Account not found';
+      document.getElementById('msg').textContent = 'We could not find an account linked to this sign-in link. Please contact support if you believe this is an error.';
+    }
+  </script>
+</body>
+</html>

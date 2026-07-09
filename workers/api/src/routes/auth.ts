@@ -25,6 +25,56 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
   });
 }
 
+// ── URL helpers ───────────────────────────────────────────────────
+//
+// Platform lives at platform.headorn.com (one Pages project, path-based):
+//   platform.headorn.com/           ← signup
+//   platform.headorn.com/onboarding ← post-magic-link setup + Connect
+//   platform.headorn.com/admin      ← platform owner admin (Queen's view)
+//
+// Each merchant tenant lives at:
+//   newstore.headorn.com/dashboard  ← merchant's own dashboard
+//   newstore.headorn.com/           ← buyer storefront
+//
+// SECURITY: __Host- prefixed cookies cannot carry a Domain attribute,
+// so a session cookie is permanently locked to the exact host that set
+// it. Rather than fighting that by trying to share one cookie across
+// hosts, we set the cookie on whichever host the browser is ALREADY
+// on when /auth/verify runs — which means the magic link itself must
+// point straight at the correct destination host. This keeps every
+// redirect after verification purely relative (same-origin), which
+// means no CORS and no cross-site cookie handling is needed anywhere
+// in the merchant dashboard flow.
+
+const MERCHANT_STATUSES = ['pending_products', 'ready', 'live'] as const;
+const ONBOARDING_STATUSES = ['pending_verification', 'pending_onboarding', 'pending_connect'] as const;
+
+function platformBase(env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? 'https://platform.headorn.com'
+    : 'http://localhost:8789';
+}
+
+function tenantOrigin(slug: string, env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? `https://${slug}.headorn.com`
+    : `http://${slug}.localhost:8786`; // dev: router on 8786, real subdomain via *.localhost
+}
+
+// ---------------------------------------------------------------------------
+// HTML escaping
+// Prevents user-controlled values breaking email HTML
+// ---------------------------------------------------------------------------
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 // ── POST /auth/magic-link ─────────────────────────────────────────
 
 export async function handleMagicLink(
@@ -51,50 +101,39 @@ export async function handleMagicLink(
   try {
     const stripeRes = await fetch(
       `https://api.stripe.com/v1/customers?email=${encodeURIComponent(email)}&limit=1`,
-      {
-        headers: {
-          Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } }
     );
 
     const stripeData = await stripeRes.json() as {
       data: Array<{ id: string; metadata?: { tenantId?: string } }>;
     };
 
-
-    if (!stripeData.data?.length) {
-      console.log('debug: bailing — no customer');
-      return safeResponse;
-    }
+    if (!stripeData.data?.length) return safeResponse;
 
     const customer = stripeData.data[0];
     const tenantId = customer.metadata?.tenantId;
-
-    if (!tenantId) {
-      console.log('debug: bailing — no tenantId');
-      return safeResponse;
-    }
+    if (!tenantId) return safeResponse;
 
     const tenant = await getTenantMeta(env, tenantId);
-    console.log('debug: tenant from KV:', JSON.stringify(tenant));
-
-    if (!tenant) {
-      console.log('debug: bailing — tenant not in KV');
-      return safeResponse;
-    }
-
-    if (tenant.status === 'pending_payment') {
-      console.log('debug: bailing — pending_payment');
-      return safeResponse;
-    }
+    if (!tenant) return safeResponse;
+    if (tenant.status === 'pending_payment') return safeResponse;
 
     const token = await createMagicToken(env, tenantId);
 
+    // ── Pick the magic link's HOST based on where the session needs
+    // to live. This is the fix: verify must run on the same host the
+    // dashboard/onboarding UI will load from, or the __Host- cookie
+    // never reaches it.
+    let linkBase: string;
+    if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status) && tenant.slug) {
+      linkBase = tenantOrigin(tenant.slug, env);
+    } else {
+      linkBase = platformBase(env);
+    }
 
-const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
+    const magicUrl = `${linkBase}/auth/verify?token=${token}`;
 
-    const resendRes = await fetch('https://api.resend.com/emails', {
+    await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
@@ -103,18 +142,19 @@ const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
       body: JSON.stringify({
         from: env.RESEND_FROM,
         to: [email],
-        subject: 'Your Solostore login link',
+        subject: 'Sign in to your SoloStore dashboard',
         html: `
-          <p>Click the link below to log in to your Solostore dashboard.</p>
-          <p><a href="${magicUrl}">Log in to Solostore</a></p>
+          <p>Click the link below to sign in to your SoloStore dashboard.</p>
+          <p><a href="${escapeHtml(magicUrl)}"
+             style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;
+                    padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+            Sign in to your store →
+          </a></p>
           <p>This link expires in 15 minutes and can only be used once.</p>
           <p>If you didn't request this, you can safely ignore this email.</p>
         `,
       }),
     });
-
-    const resendData = await resendRes.json();
-    console.log('debug: Resend response:', JSON.stringify(resendData));
 
   } catch (err) {
     console.error('magic-link error:', err);
@@ -124,48 +164,56 @@ const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
 }
 
 // ── GET /auth/verify?token={token} ───────────────────────────────
+//
+// Runs on whatever host the magic link pointed at (platform host or
+// tenant subdomain — decided at send time in handleMagicLink above).
+// Because of that, Set-Cookie always applies to the correct host, and
+// every redirect below can be a plain relative path — no cross-origin
+// cookie handling required.
 
 export async function handleVerify(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const url = new URL(request.url);
+  const url   = new URL(request.url);
   const token = url.searchParams.get('token') ?? '';
 
+  // Error redirects: relative, so they stay on whichever host is
+  // actually serving this request (platform or tenant subdomain) —
+  // fixes the earlier "relative paths in error redirects" issue by
+  // making that behaviour deliberate rather than accidental.
   if (!token) {
-    return Response.redirect('/auth-error?reason=missing_token', 302);
+    return Response.redirect(`${url.origin}/auth-error?reason=missing_token`, 302);
   }
 
   const payload = await consumeMagicToken(env, token);
-
   if (!payload) {
-    return Response.redirect('/auth-error?reason=invalid_or_expired', 302);
+    return Response.redirect(`${url.origin}/auth-error?reason=invalid_or_expired`, 302);
   }
 
   const tenant = await getTenantMeta(env, payload.tenantId);
-
   if (!tenant) {
-    return Response.redirect('/auth-error?reason=tenant_not_found', 302);
+    return Response.redirect(`${url.origin}/auth-error?reason=tenant_not_found`, 302);
   }
 
   const sessionId = await createSession(env, payload.tenantId);
 
-  const redirectMap: Record<string, string> = {
-    pending_verification: '/onboarding',
-    pending_onboarding:   '/onboarding',
-    pending_connect:      '/onboarding/connect',
-    pending_products:     '/admin/products',
-    ready:                '/admin',
-    live:                 '/admin',
-  };
-
-  const destination = redirectMap[tenant.status] ?? '/admin';
-
+  // Advance status on first-ever verification
   if (tenant.status === 'pending_verification') {
     await env.SOLOSTORE_KV.put(
       kvKey.tenant(payload.tenantId),
       JSON.stringify({ ...tenant, status: 'pending_onboarding' })
     );
+  }
+
+  let destination: string;
+
+  if ((ONBOARDING_STATUSES as readonly string[]).includes(tenant.status)) {
+    destination = '/onboarding';
+  } else if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status)) {
+    destination = '/dashboard';
+  } else {
+    destination = '/onboarding';
   }
 
   return new Response(null, {
@@ -178,21 +226,26 @@ export async function handleVerify(
 }
 
 // ── POST /auth/logout ─────────────────────────────────────────────
+//
+// Also relative-origin: clears whichever host's cookie the browser
+// is actually on (merchant subdomain or platform), consistent with
+// how the session was issued.
 
 export async function handleLogout(
   request: Request,
   env: Env
 ): Promise<Response> {
   const sessionId = parseSessionCookie(request.headers.get('Cookie'));
-
   if (sessionId) {
     await deleteSession(env, sessionId);
   }
 
+  const url = new URL(request.url);
+
   return new Response(null, {
     status: 302,
     headers: {
-      Location: '/',
+      Location: url.origin,
       'Set-Cookie': clearSessionCookie(),
     },
   });
@@ -205,44 +258,28 @@ export async function handleMe(
   env: Env
 ): Promise<Response> {
   const sessionId = parseSessionCookie(request.headers.get('Cookie'));
-
-  if (!sessionId) {
-    return json({ error: 'Unauthenticated' }, 401);
-  }
+  if (!sessionId) return json({ error: 'Unauthenticated' }, 401);
 
   const session = await getSession(env, sessionId);
-
-  if (!session) {
-    return json({ error: 'Session expired or invalid' }, 401);
-  }
+  if (!session) return json({ error: 'Session expired or invalid' }, 401);
 
   const tenant = await getTenantMeta(env, session.tenantId);
-
-  if (!tenant) {
-    return json({ error: 'Tenant not found' }, 404);
-  }
+  if (!tenant) return json({ error: 'Tenant not found' }, 404);
 
   const stripeRes = await fetch(
     `https://api.stripe.com/v1/customers/${tenant.stripeCustomerId}`,
-    {
-      headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
-    }
+    { headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } }
   );
 
-  if (!stripeRes.ok) {
-    return json({ error: 'Could not retrieve account details' }, 502);
-  }
+  if (!stripeRes.ok) return json({ error: 'Could not retrieve account details' }, 502);
 
-  const customer = await stripeRes.json() as {
-    email: string;
-    name: string;
-  };
+  const customer = await stripeRes.json() as { email: string; name: string };
 
   return json({
     tenantId: tenant.id,
-    slug: tenant.slug,
-    status: tenant.status,
-    email: customer.email,
-    name: customer.name,
+    slug:     tenant.slug ?? null,
+    status:   tenant.status,
+    email:    customer.email,
+    name:     customer.name ?? null,
   });
 }

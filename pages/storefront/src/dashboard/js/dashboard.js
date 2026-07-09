@@ -7,9 +7,12 @@
    set it here and make sure CORS + credentials are configured
    on the worker side.
 ══════════════════════════════════════════════════════════ */
-const API_BASE = window.location.hostname === 'localhost'
-  ? 'http://localhost:8787'
-  : 'https://api.headorn.com';
+// Same-origin: the router forwards this page AND every API route
+// (/settings, /products, /orders, /auth) to the correct backend, so
+// there is no cross-origin request anywhere in this flow — no CORS,
+// no cross-site cookie handling. This also keeps the __Host- session
+// cookie correctly scoped to the tenant subdomain that set it.
+const API_BASE = '';
 /* ══════════════════════════════════════════════════════════
    FETCH HELPER
    - credentials: 'include' sends the session cookie set by the

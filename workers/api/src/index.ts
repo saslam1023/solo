@@ -6,7 +6,7 @@ import {
   handleLogout,
   handleMe,
 } from './routes/auth';
-import { handleRegister } from './handlers/register';
+import { handleRegister, handleCheckSlug } from './handlers/register';
 import {
   handleConnectStart,
   handleConnectReturn,
@@ -40,48 +40,50 @@ import {
 } from './handlers/settings';
 import { requireAuth } from './lib/auth';
 
-// ─── CORS ──────────────────────────────────────────────────────────────────
-//
-// The dashboard (Pages, port 8789 in dev) is a different origin from this
-// API worker (port 8787 in dev). Because dashboard.js sends credentials
-// (the __Host- session cookie via credentials: 'include'), the browser
-// requires an explicit, single origin in Access-Control-Allow-Origin —
-// a wildcard '*' is rejected by browsers whenever credentials are involved.
-//
-// ALLOWED_ORIGINS is therefore an explicit allowlist, not a wildcard.
-// Add the production dashboard origin here once it exists (e.g.
-// https://app.headorn.com) — do NOT widen this to a wildcard or a regex
-// that could match attacker-controlled origins.
+// ── CORS ──────────────────────────────────────────────────────────────────────
+// Origins allowed to make credentialed requests (cookies) to the API.
+// Storefront pages (buyer-facing) don't need credentials so aren't listed here —
+// only dashboard origins that send the session cookie need to be in this list.
 
 const ALLOWED_ORIGINS = new Set([
-  'http://localhost:8789',
+  'http://localhost:8787', 
+  'http://localhost:8788', 
+  'http://localhost:8789',          // platform.headorn.com dev server
+  'http://localhost:8786',          // Router dev
+  'https://platform.headorn.com',   // Platform — signup, /onboarding, /dashboard
+  // Tenant subdomains (newstore.headorn.com/admin) handled dynamically below
 ]);
 
-function corsHeaders(origin: string | null): Record<string, string> {
-  if (!origin || !ALLOWED_ORIGINS.has(origin)) {
-    return {};
-  }
-  return {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Credentials': 'true',
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Vary': 'Origin',
-  };
+function corsHeaders(origin: string | null, env: Env): Record<string, string> {
+  // Allow any *.headorn.com subdomain (merchant /admin)
+  const allowed =
+    origin &&
+    (ALLOWED_ORIGINS.has(origin) ||
+      (env.ENVIRONMENT === 'production'
+        ? /^https:\/\/[a-z0-9-]+\.headorn\.com$/.test(origin)
+        : /^http:\/\/[a-z0-9-]+\.localhost(:\d+)?$/.test(origin)));
+
+  return allowed
+    ? {
+        'Access-Control-Allow-Origin': origin!,
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+        'Vary': 'Origin',
+      }
+    : {};
 }
 
-function withCors(response: Response, origin: string | null): Response {
-  const headers = corsHeaders(origin);
-  if (Object.keys(headers).length === 0) return response;
-
-  const newHeaders = new Headers(response.headers);
-  for (const [key, value] of Object.entries(headers)) {
-    newHeaders.set(key, value);
+function withCors(response: Response, origin: string | null, env: Env): Response {
+  const headers = new Headers(response.headers);
+  const cors = corsHeaders(origin, env);
+  for (const [k, v] of Object.entries(cors)) {
+    headers.set(k, v);
   }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: newHeaders,
+    headers,
   });
 }
 
@@ -90,156 +92,134 @@ export default {
     const url = new URL(request.url);
     const method = request.method;
     const path = url.pathname;
-    const origin = request.headers.get('Origin');
+    const origin = request.headers.get('origin');
 
-    // ── CORS preflight ─────────────────────────────────────────────
-    // Browsers send OPTIONS before any cross-origin request that carries
-    // credentials or non-simple headers (Content-Type: application/json
-    // triggers this). Must be handled before any auth/route logic.
+    // ── Preflight ─────────────────────────────────────────────────────────
     if (method === 'OPTIONS') {
-      const headers = corsHeaders(origin);
-      if (Object.keys(headers).length === 0) {
-        // Origin not on the allowlist — no CORS headers, browser will
-        // block the actual request. Still return 204 rather than an
-        // error; we don't want to leak info about valid vs invalid origins.
-        return new Response(null, { status: 204 });
-      }
-      return new Response(null, { status: 204, headers });
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(origin, env),
+      });
     }
 
-    const respond = (response: Response) => withCors(response, origin);
+    let response: Response;
 
-    // ── Registration (public, no auth) ────────────────────────────
-    if (path === '/register' && method === 'POST') {
-      return respond(await handleRegister(request, env));
-    }
+    // ── Registration (public) ─────────────────────────────────────────────
+    if (path === '/register/check-slug' && method === 'GET') {
+      response = await handleCheckSlug(request, env);
+    } else if (path === '/register' && method === 'POST') {
+      response = await handleRegister(request, env);
 
-    // ── Auth routes ───────────────────────────────────────────────
-    if (path === '/auth/magic-link' && method === 'POST') {
-      return respond(await handleMagicLink(request, env));
-    }
+    // ── Auth ──────────────────────────────────────────────────────────────
+    } else if (path === '/auth/magic-link' && method === 'POST') {
+      response = await handleMagicLink(request, env);
+    } else if (path === '/auth/verify' && method === 'GET') {
+      response = await handleVerify(request, env);
+    } else if (path === '/auth/logout' && method === 'POST') {
+      response = await handleLogout(request, env);
+    } else if (path === '/auth/me' && method === 'GET') {
+      response = await handleMe(request, env);
 
-    if (path === '/auth/verify' && method === 'GET') {
-      return respond(await handleVerify(request, env));
-    }
+    // ── Connect ───────────────────────────────────────────────────────────
+    } else if (path === '/connect/start' && method === 'POST') {
+      response = await handleConnectStart(request, env);
+    } else if (path === '/connect/return' && method === 'GET') {
+      response = await handleConnectReturn(request, env);
+    } else if (path === '/connect/refresh' && method === 'GET') {
+      response = await handleConnectRefresh(request, env);
 
-    if (path === '/auth/logout' && method === 'POST') {
-      return respond(await handleLogout(request, env));
-    }
-
-    if (path === '/auth/me' && method === 'GET') {
-      return respond(await handleMe(request, env));
-    }
-
-    // ── Connect routes ────────────────────────────────────────────
-    if (path === '/connect/start' && method === 'POST') {
-      return respond(await handleConnectStart(request, env));
-    }
-    if (path === '/connect/return' && method === 'GET') {
-      return respond(await handleConnectReturn(request, env));
-    }
-    if (path === '/connect/refresh' && method === 'GET') {
-      return respond(await handleConnectRefresh(request, env));
-    }
-
-    // ── Storefront routes (public, no merchant auth) ───────────────
-    if (path === '/storefront/checkout' && method === 'POST') {
-      return respond(await handleStorefrontCheckout(request, env));
-    }
-    if (path === '/storefront/products' && method === 'GET') {
-      return respond(await handleStorefrontListProducts(request, env));
-    }
-    if (path.match(/^\/storefront\/products\/[^/]+$/) && method === 'GET') {
+    // ── Storefront (public, no merchant auth) ─────────────────────────────
+    } else if (path === '/storefront/checkout' && method === 'POST') {
+      response = await handleStorefrontCheckout(request, env);
+    } else if (path === '/storefront/products' && method === 'GET') {
+      response = await handleStorefrontListProducts(request, env);
+    } else if (path.match(/^\/storefront\/products\/[^/]+$/) && method === 'GET') {
       const productId = path.split('/')[3];
-      return respond(await handleStorefrontGetProduct(request, env, productId));
-    }
+      response = await handleStorefrontGetProduct(request, env, productId);
 
-    // ── Product routes (all require merchant auth) ─────────────────
-    if (path.startsWith('/products')) {
+    // ── Products (merchant auth required) ────────────────────────────────
+    } else if (path.startsWith('/products')) {
       const session = await requireAuth(request, env);
-      if (session instanceof Response) return respond(session);
-      const { tenantId } = session;
+      if (session instanceof Response) {
+        response = session;
+      } else {
+        const { tenantId } = session;
+        if (path === '/products' && method === 'POST') {
+          response = await handleCreateProduct(request, env, tenantId);
+        } else if (path === '/products' && method === 'GET') {
+          response = await handleListProducts(request, env, tenantId);
+        } else if (path.match(/^\/products\/[^/]+$/) && method === 'GET') {
+          response = await handleGetProduct(request, env, tenantId, path.split('/')[2]);
+        } else if (path.match(/^\/products\/[^/]+$/) && method === 'PATCH') {
+          response = await handleUpdateProduct(request, env, tenantId, path.split('/')[2]);
+        } else if (path.match(/^\/products\/[^/]+$/) && method === 'DELETE') {
+          response = await handleArchiveProduct(request, env, tenantId, path.split('/')[2]);
+        } else if (path.match(/^\/products\/[^/]+\/variants\/[^/]+$/) && method === 'PATCH') {
+          const parts = path.split('/');
+          response = await handleUpdateVariant(request, env, tenantId, parts[2], parts[4]);
+        } else if (path.match(/^\/products\/[^/]+\/variants\/[^/]+$/) && method === 'DELETE') {
+          const parts = path.split('/');
+          response = await handleArchiveVariant(request, env, tenantId, parts[2], parts[4]);
+        } else if (path.match(/^\/products\/[^/]+\/images$/) && method === 'POST') {
+          response = await handleUploadProductImage(request, env, tenantId, path.split('/')[2]);
+        } else {
+          response = new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
+      }
 
-      if (path === '/products' && method === 'POST') {
-        return respond(await handleCreateProduct(request, env, tenantId));
-      }
-      if (path === '/products' && method === 'GET') {
-        return respond(await handleListProducts(request, env, tenantId));
-      }
-      if (path.match(/^\/products\/[^/]+$/) && method === 'GET') {
-        const productId = path.split('/')[2];
-        return respond(await handleGetProduct(request, env, tenantId, productId));
-      }
-      if (path.match(/^\/products\/[^/]+$/) && method === 'PATCH') {
-        const productId = path.split('/')[2];
-        return respond(await handleUpdateProduct(request, env, tenantId, productId));
-      }
-      if (path.match(/^\/products\/[^/]+$/) && method === 'DELETE') {
-        const productId = path.split('/')[2];
-        return respond(await handleArchiveProduct(request, env, tenantId, productId));
-      }
-      if (path.match(/^\/products\/[^/]+\/variants\/[^/]+$/) && method === 'PATCH') {
-        const parts = path.split('/');
-        return respond(await handleUpdateVariant(request, env, tenantId, parts[2], parts[4]));
-      }
-      if (path.match(/^\/products\/[^/]+\/variants\/[^/]+$/) && method === 'DELETE') {
-        const parts = path.split('/');
-        return respond(await handleArchiveVariant(request, env, tenantId, parts[2], parts[4]));
-      }
-      if (path.match(/^\/products\/[^/]+\/images$/) && method === 'POST') {
-        const productId = path.split('/')[2];
-        return respond(await handleUploadProductImage(request, env, tenantId, productId));
-      }
-    }
-
-    // ── Order routes (all require merchant auth) ───────────────────
-    if (path.startsWith('/orders')) {
+    // ── Orders (merchant auth required) ──────────────────────────────────
+    } else if (path.startsWith('/orders')) {
       const session = await requireAuth(request, env);
-      if (session instanceof Response) return respond(session);
-      const { tenantId } = session;
+      if (session instanceof Response) {
+        response = session;
+      } else {
+        const { tenantId } = session;
+        if (path === '/orders' && method === 'GET') {
+          response = await handleListOrders(request, env, tenantId);
+        } else if (path.match(/^\/orders\/[^/]+$/) && method === 'GET') {
+          response = await handleGetOrder(request, env, tenantId, path.split('/')[2]);
+        } else if (path.match(/^\/orders\/[^/]+\/status$/) && method === 'PATCH') {
+          response = await handleUpdateOrderStatus(request, env, tenantId, path.split('/')[2]);
+        } else {
+          response = new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
+      }
 
-      if (path === '/orders' && method === 'GET') {
-        return respond(await handleListOrders(request, env, tenantId));
-      }
-      if (path.match(/^\/orders\/[^/]+$/) && method === 'GET') {
-        const orderId = path.split('/')[2];
-        return respond(await handleGetOrder(request, env, tenantId, orderId));
-      }
-      if (path.match(/^\/orders\/[^/]+\/status$/) && method === 'PATCH') {
-        const orderId = path.split('/')[2];
-        return respond(await handleUpdateOrderStatus(request, env, tenantId, orderId));
-      }
-    }
-
-    // ── Settings routes (all require merchant auth) ─────────────────
-    if (path.startsWith('/settings')) {
+    // ── Settings (merchant auth required) ────────────────────────────────
+    } else if (path.startsWith('/settings')) {
       const session = await requireAuth(request, env);
-      if (session instanceof Response) return respond(session);
-      const { tenantId } = session;
+      if (session instanceof Response) {
+        response = session;
+      } else {
+        const { tenantId } = session;
+        if (path === '/settings' && method === 'GET') {
+          response = await handleGetSettings(request, env, tenantId);
+        } else if (path === '/settings/store' && method === 'PATCH') {
+          response = await handleUpdateStoreSettings(request, env, tenantId);
+        } else if (path === '/settings/domain' && method === 'PATCH') {
+          response = await handleUpdateDomainSettings(request, env, tenantId);
+        } else {
+          response = new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
+      }
 
-      if (path === '/settings' && method === 'GET') {
-        return respond(await handleGetSettings(request, env, tenantId));
-      }
-      if (path === '/settings/store' && method === 'PATCH') {
-        return respond(await handleUpdateStoreSettings(request, env, tenantId));
-      }
-      if (path === '/settings/domain' && method === 'PATCH') {
-        return respond(await handleUpdateDomainSettings(request, env, tenantId));
-      }
-    }
-
-    // ── Account routes (requires merchant auth) ──────────────────────
-    if (path === '/account' && method === 'DELETE') {
+    // ── Account (merchant auth required) ─────────────────────────────────
+    } else if (path === '/account' && method === 'DELETE') {
       const session = await requireAuth(request, env);
-      if (session instanceof Response) return respond(session);
-      const { tenantId } = session;
-      return respond(await handleDeleteAccount(request, env, tenantId));
+      if (session instanceof Response) {
+        response = session;
+      } else {
+        response = await handleDeleteAccount(request, env, session.tenantId);
+      }
+
+    // ── 404 ───────────────────────────────────────────────────────────────
+    } else {
+      response = new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // ── 404 ───────────────────────────────────────────────────────
-    return respond(new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+    return withCors(response, origin, env);
   },
 };

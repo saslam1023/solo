@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Set up your store — SoloStore</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #0f0f0f;
+      --ink-mid:   #444;
+      --ink-faint: #888;
+      --rule:      #e2e2e2;
+      --surface:   #fafaf8;
+      --white:     #ffffff;
+      --accent:    #1a1a2e;
+      --ok:        #1a7f4b;
+      --ok-bg:     #f0faf4;
+      --err:       #c0392b;
+      --err-bg:    #fdf2f0;
+      --warn-bg:   #fffbeb;
+      --warn:      #92400e;
+      --step-done: #d1fae5;
+      --step-active: #1a1a2e;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--surface);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--rule);
+      background: var(--white);
+    }
+
+    .logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .nav-status {
+      font-size: 0.8125rem;
+      color: var(--ink-faint);
+    }
+
+    /* ── Layout ── */
+    .page {
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 3rem 1.5rem;
+      gap: 3rem;
+    }
+
+    /* ── Progress sidebar ── */
+    .progress {
+      width: 220px;
+      flex-shrink: 0;
+      padding-top: 0.25rem;
+    }
+
+    .progress-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 1.25rem;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      opacity: 0.45;
+      transition: opacity 0.2s;
+    }
+
+    .step.done, .step.active { opacity: 1; }
+
+    .step-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--rule);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--ink-faint);
+      background: var(--white);
+      margin-top: 1px;
+    }
+
+    .step.done .step-dot {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: #fff;
+    }
+
+    .step.active .step-dot {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .step-text strong {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .step-text span {
+      font-size: 0.75rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+    }
+
+    /* ── Main content ── */
+    .main {
+      flex: 1;
+      max-width: 520px;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      display: none;
+    }
+
+    .panel.active { display: block; }
+
+    .panel-eyebrow {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 0.75rem;
+    }
+
+    .panel h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+
+    .panel-sub {
+      font-size: 0.9375rem;
+      color: var(--ink-mid);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 1.75rem;
+    }
+
+    /* ── Connect panel ── */
+    .connect-list {
+      list-style: none;
+      margin-bottom: 1.5rem;
+    }
+
+    .connect-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--rule);
+      font-size: 0.875rem;
+      color: var(--ink-mid);
+      line-height: 1.5;
+    }
+
+    .connect-list li:last-child { border-bottom: none; }
+
+    .connect-list .icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    .connect-btn {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .connect-btn:hover { background: #0d0d1f; }
+    .connect-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .stripe-note {
+      font-size: 0.75rem;
+      color: var(--ink-faint);
+      text-align: center;
+      margin-top: 0.75rem;
+      line-height: 1.5;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+
+    .spinner.visible { display: block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Slug change panel ── */
+    .field { margin-bottom: 1.125rem; }
+
+    label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .slug-wrap {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      overflow: hidden;
+      background: var(--white);
+      transition: border-color 0.15s;
+    }
+
+    .slug-wrap:focus-within { border-color: var(--accent); }
+    .slug-wrap.input-ok { border-color: var(--ok); }
+    .slug-wrap.input-error { border-color: var(--err); }
+
+    .slug-prefix {
+      padding: 0.65rem 0.75rem 0.65rem 0.875rem;
+      font-size: 0.875rem;
+      color: var(--ink-faint);
+      background: #f5f5f3;
+      border-right: 1px solid var(--rule);
+      white-space: nowrap;
+    }
+
+    .slug-input {
+      flex: 1;
+      padding: 0.65rem 0.875rem;
+      font-size: 0.9375rem;
+      border: none;
+      outline: none;
+      background: transparent;
+    }
+
+    .slug-status {
+      padding: 0 0.75rem;
+      font-size: 0.75rem;
+    }
+
+    .field-hint {
+      font-size: 0.75rem;
+      color: var(--ink-faint);
+      margin-top: 0.35rem;
+    }
+
+    .field-error {
+      font-size: 0.75rem;
+      color: var(--err);
+      margin-top: 0.35rem;
+      display: none;
+    }
+
+    .field-error.visible { display: block; }
+
+    .save-btn {
+      padding: 0.7rem 1.25rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .save-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .skip-btn {
+      margin-left: 0.75rem;
+      padding: 0.7rem 1rem;
+      background: none;
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      font-size: 0.875rem;
+      color: var(--ink-mid);
+      cursor: pointer;
+    }
+
+    /* ── Complete panel ── */
+    .complete-panel {
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+
+    .complete-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .complete-panel h1 { margin-bottom: 0.5rem; }
+
+    .complete-panel p {
+      font-size: 0.9375rem;
+      color: var(--ink-mid);
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+
+    .go-btn {
+      display: inline-flex;
+      padding: 0.8rem 1.75rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .go-btn:hover { background: #0d0d1f; }
+
+    /* ── Error / loading ── */
+    .loading {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--ink-faint);
+      font-size: 0.9375rem;
+    }
+
+    .error-panel {
+      padding: 1.5rem;
+      background: var(--err-bg);
+      border: 1px solid #f5c6c2;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      color: var(--err);
+    }
+
+    @media (max-width: 700px) {
+      .page { flex-direction: column; padding: 2rem 1rem; }
+      .progress { width: 100%; }
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="logo">SoloStore</a>
+    <span class="nav-status" id="nav-status"></span>
+  </nav>
+
+  <div class="page">
+
+    <!-- Progress sidebar -->
+    <aside class="progress" id="progress-sidebar">
+      <p class="progress-title">Setup steps</p>
+
+      <div class="step" id="step-1">
+        <div class="step-dot" id="step-1-dot">1</div>
+        <div class="step-text">
+          <strong>Create account</strong>
+          <span>Email verified</span>
+        </div>
+      </div>
+
+      <div class="step" id="step-2">
+        <div class="step-dot" id="step-2-dot">2</div>
+        <div class="step-text">
+          <strong>Connect payouts</strong>
+          <span>Set up Stripe to receive money</span>
+        </div>
+      </div>
+
+      <div class="step" id="step-3">
+        <div class="step-dot" id="step-3-dot">3</div>
+        <div class="step-text">
+          <strong>Add products</strong>
+          <span>Your store is ready</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main" id="main-content">
+      <div class="loading" id="loading">Loading your account…</div>
+    </main>
+
+  </div>
+
+<script>
+  const API = 'http://localhost:8787'; // dev
+
+  let tenant = null;
+
+  // ── Fetch session ──────────────────────────────────────────────────────────
+  async function init() {
+    try {
+      const res = await fetch(`${API}/auth/me`, { credentials: 'include' });
+
+      if (res.status === 401) {
+        window.location.href = '/?reason=session_expired';
+        return;
+      }
+
+      if (!res.ok) throw new Error('Could not load account');
+
+      tenant = await res.json();
+      document.getElementById('nav-status').textContent = tenant.email || '';
+      render();
+
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main-content').innerHTML = `
+        <div class="error-panel">
+          Could not load your account. <a href="/" style="color:inherit;font-weight:600;">Return to homepage</a>
+        </div>`;
+    }
+  }
+
+  // ── Render based on status ─────────────────────────────────────────────────
+  function render() {
+    document.getElementById('loading').style.display = 'none';
+    updateProgress();
+
+    const status = tenant.status;
+
+    if (status === 'pending_onboarding' || status === 'pending_verification') {
+      // Check if slug was taken (came from post-payment redirect and slug collision)
+      // For now show Connect panel — slug change will appear if needed
+      showConnectPanel();
+    } else if (status === 'pending_connect') {
+      showConnectPanel();
+    } else if (status === 'pending_products') {
+      showCompletePanel();
+    } else if (status === 'ready' || status === 'live') {
+      // Already fully set up — redirect straight to dashboard
+      // Dev: router on 8786 handles subdomain simulation via X-Dev-Host
+      window.location.href = `http://localhost:8785/dashboard`; // router forwards with tenant from session
+    } else {
+      document.getElementById('main-content').innerHTML = `
+        <div class="error-panel">
+          Unexpected account status: ${status}. Please contact support.
+        </div>`;
+    }
+  }
+
+  function updateProgress() {
+    const status = tenant.status;
+    const s1 = document.getElementById('step-1');
+    const s2 = document.getElementById('step-2');
+    const s3 = document.getElementById('step-3');
+
+    // Step 1 always done by the time merchant reaches platform.headorn.com/onboarding
+    s1.classList.add('done');
+    document.getElementById('step-1-dot').textContent = '✓';
+
+    if (['pending_connect', 'pending_products', 'ready', 'live'].includes(status)) {
+      s2.classList.add('done');
+      document.getElementById('step-2-dot').textContent = '✓';
+    } else {
+      s2.classList.add('active');
+    }
+
+    if (['pending_products', 'ready', 'live'].includes(status)) {
+      s3.classList.add('active');
+    }
+  }
+
+  // ── Connect panel ──────────────────────────────────────────────────────────
+  function showConnectPanel() {
+    const slugNotice = tenant.slug
+      ? `<div style="margin-bottom:1.5rem;padding:0.75rem 1rem;background:var(--warn-bg);border:1px solid #fde68a;border-radius:8px;font-size:0.8125rem;color:var(--warn);">
+           Your store address will be <strong>${tenant.slug}.headorn.com</strong>. You can change this in your dashboard settings after setup.
+         </div>`
+      : '';
+
+    document.getElementById('main-content').innerHTML = `
+      <p class="panel-eyebrow">Step 2 of 3</p>
+      <h1>Connect your bank account</h1>
+      <p class="panel-sub">
+        Set up Stripe to receive payments directly into your bank. This takes about 5 minutes — you'll need your bank details and ID.
+      </p>
+
+      ${slugNotice}
+
+      <div class="card">
+        <ul class="connect-list">
+          <li><span class="icon">💳</span><span>Payments from your customers go straight to your bank account</span></li>
+          <li><span class="icon">🔒</span><span>Your financial details are handled securely by Stripe — we never see them</span></li>
+          <li><span class="icon">⚡</span><span>Once connected, your store goes live immediately</span></li>
+        </ul>
+
+        <button class="connect-btn" id="connect-btn">
+          <span class="spinner" id="connect-spinner"></span>
+          <span id="connect-label">Connect with Stripe →</span>
+        </button>
+        <p class="stripe-note">You'll be redirected to Stripe's secure site. Come back here when you're done.</p>
+      </div>
+    `;
+
+    document.getElementById('connect-btn').addEventListener('click', startConnect);
+  }
+
+  async function startConnect() {
+    const btn = document.getElementById('connect-btn');
+    const spinner = document.getElementById('connect-spinner');
+    const label = document.getElementById('connect-label');
+
+    btn.disabled = true;
+    spinner.classList.add('visible');
+    label.textContent = 'Opening Stripe…';
+
+    try {
+      const res = await fetch(`${API}/connect/start`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        window.location.href = '/?reason=session_expired';
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || 'Could not start Connect onboarding');
+      }
+
+      window.location.href = data.url;
+
+    } catch (err) {
+      btn.disabled = false;
+      spinner.classList.remove('visible');
+      label.textContent = 'Connect with Stripe →';
+
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'margin-top:0.75rem;padding:0.65rem;background:var(--err-bg);border-radius:7px;font-size:0.8125rem;color:var(--err);';
+      errDiv.textContent = err.message || 'Something went wrong. Please try again.';
+      document.getElementById('connect-btn').after(errDiv);
+    }
+  }
+
+  // ── Complete panel ─────────────────────────────────────────────────────────
+  function showCompletePanel() {
+   // const adminUrl = `http://localhost:8786/admin`; // dev — router on 8786
+    const adminUrl = `http://${tenant.slug}.localhost:8786/dashboard`;
+
+    document.getElementById('main-content').innerHTML = `
+      <div class="complete-panel">
+        <div class="complete-icon">🎉</div>
+        <h1>Your store is ready</h1>
+        <p>
+          Stripe is connected and payments are enabled. Head to your dashboard to add your first products and open your store.
+        </p>
+        <p style="font-size:0.8125rem;color:var(--ink-faint);margin-bottom:1.5rem;">
+          Your store address: <strong>${tenant.slug}.headorn.com</strong>
+        </p>
+        <a href="${adminUrl}" class="go-btn">Go to your dashboard →</a>
+      </div>
+    `;
+
+    // Update step 3 to active
+    document.getElementById('step-3').classList.add('active');
+  }
+
+  init();
+</script>
+</body>
+</html>

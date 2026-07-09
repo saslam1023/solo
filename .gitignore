@@ -11,3 +11,8 @@ dev.vars-base
 packages/shared/src/o-index.ts
 workers/api/src/o-index.ts
 workers/router/src/o-index.ts
+
+cookies.txt
+*.txt
+**/*.cookies
+**/*.cookie
