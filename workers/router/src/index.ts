@@ -45,10 +45,9 @@ export interface Env {
   SOLOSTORE_KV: KVNamespace;
   ENVIRONMENT: string;
   API_WORKER_URL: string;   // dev only: http://localhost:8787
-  PAGES_URL: string;        // dev only: http://localhost:8785 (wrangler pages dev)
-  // Service bindings — uncomment when deploying:
+  ASSETS: Fetcher;          // dashboard static build, bound via [assets] in wrangler.toml
+  // Service binding — uncomment when deploying:
   // API: Fetcher;
-  // DASHBOARD: Fetcher;
 }
 
 // ─── WAF: Blocked paths ───────────────────────────────────────────────────────
@@ -154,36 +153,30 @@ async function forwardToApi(
   return fetch(forwardedRequest);
 }
 
-// Proxies /dashboard* to the Pages dev server. This is a DEV-ONLY
-// convenience — production needs a real decision on how a single
-// Pages project serves HTML across every merchant's wildcard
-// subdomain (Cloudflare Pages routes / Workers-for-Platforms style
-// binding), which is unresolved and tracked separately. This keeps
-// local testing working without blocking on that design.
+// Serves the dashboard static build (HTML/CSS/JS) directly from this
+// Worker's bound assets ([assets] in wrangler.toml — same binary in
+// dev and production, no separate Pages deployment, no service-binding
+// trust boundary between two Workers). By the time we get here, the
+// tenant has already been resolved and status-gated by the caller —
+// env.ASSETS never runs ahead of that check because run_worker_first
+// is set in wrangler.toml, so static files can never be reached by an
+// unauthenticated request or an inactive tenant.
+//
+// Requests for a bare directory ("/dashboard") are rewritten to the
+// index file, since Cloudflare's asset handler matches by exact path.
 async function forwardToDashboard(
   request: Request,
-  tenant: TenantMeta,
   env: Env
 ): Promise<Response> {
   const url = new URL(request.url);
-  const target = new URL(url.pathname + url.search, env.PAGES_URL);
 
-  const headers = new Headers(request.headers);
-  headers.delete('x-tenant-id');
-  headers.delete('x-tenant-slug');
-  headers.set('x-tenant-id', tenant.id);
-  headers.set('x-tenant-slug', tenant.slug ?? '');
+  let assetPath = url.pathname;
+  if (assetPath === '/dashboard' || assetPath === '/dashboard/') {
+    assetPath = '/dashboard/index.html';
+  }
 
-  const forwardedRequest = new Request(target.toString(), {
-    method: request.method,
-    headers,
-    body: request.body,
-  });
-
-  // Production: use service binding
-  // if (env.DASHBOARD) return env.DASHBOARD.fetch(forwardedRequest);
-
-  return fetch(forwardedRequest);
+  const assetUrl = new URL(assetPath, url.origin);
+  return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -222,7 +215,7 @@ export default {
     }
 
     if (url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/')) {
-      return forwardToDashboard(request, tenant, env);
+      return forwardToDashboard(request, env);
     }
 
     return forwardToApi(request, tenant, env);

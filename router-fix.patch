@@ -1,0 +1,106 @@
+diff --git a/workers/router/src/index.ts b/workers/router/src/index.ts
+index 57cb617..85a5672 100644
+--- a/workers/router/src/index.ts
++++ b/workers/router/src/index.ts
+@@ -45,10 +45,9 @@ export interface Env {
+   SOLOSTORE_KV: KVNamespace;
+   ENVIRONMENT: string;
+   API_WORKER_URL: string;   // dev only: http://localhost:8787
+-  PAGES_URL: string;        // dev only: http://localhost:8785 (wrangler pages dev)
+-  // Service bindings — uncomment when deploying:
++  ASSETS: Fetcher;          // dashboard static build, bound via [assets] in wrangler.toml
++  // Service binding — uncomment when deploying:
+   // API: Fetcher;
+-  // DASHBOARD: Fetcher;
+ }
+ 
+ // ─── WAF: Blocked paths ───────────────────────────────────────────────────────
+@@ -154,36 +153,30 @@ async function forwardToApi(
+   return fetch(forwardedRequest);
+ }
+ 
+-// Proxies /dashboard* to the Pages dev server. This is a DEV-ONLY
+-// convenience — production needs a real decision on how a single
+-// Pages project serves HTML across every merchant's wildcard
+-// subdomain (Cloudflare Pages routes / Workers-for-Platforms style
+-// binding), which is unresolved and tracked separately. This keeps
+-// local testing working without blocking on that design.
++// Serves the dashboard static build (HTML/CSS/JS) directly from this
++// Worker's bound assets ([assets] in wrangler.toml — same binary in
++// dev and production, no separate Pages deployment, no service-binding
++// trust boundary between two Workers). By the time we get here, the
++// tenant has already been resolved and status-gated by the caller —
++// env.ASSETS never runs ahead of that check because run_worker_first
++// is set in wrangler.toml, so static files can never be reached by an
++// unauthenticated request or an inactive tenant.
++//
++// Requests for a bare directory ("/dashboard") are rewritten to the
++// index file, since Cloudflare's asset handler matches by exact path.
+ async function forwardToDashboard(
+   request: Request,
+-  tenant: TenantMeta,
+   env: Env
+ ): Promise<Response> {
+   const url = new URL(request.url);
+-  const target = new URL(url.pathname + url.search, env.PAGES_URL);
+-
+-  const headers = new Headers(request.headers);
+-  headers.delete('x-tenant-id');
+-  headers.delete('x-tenant-slug');
+-  headers.set('x-tenant-id', tenant.id);
+-  headers.set('x-tenant-slug', tenant.slug ?? '');
+ 
+-  const forwardedRequest = new Request(target.toString(), {
+-    method: request.method,
+-    headers,
+-    body: request.body,
+-  });
+-
+-  // Production: use service binding
+-  // if (env.DASHBOARD) return env.DASHBOARD.fetch(forwardedRequest);
++  let assetPath = url.pathname;
++  if (assetPath === '/dashboard' || assetPath === '/dashboard/') {
++    assetPath = '/dashboard/index.html';
++  }
+ 
+-  return fetch(forwardedRequest);
++  const assetUrl = new URL(assetPath, url.origin);
++  return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+ }
+ 
+ // ─── Main handler ─────────────────────────────────────────────────────────────
+@@ -222,7 +215,7 @@ export default {
+     }
+ 
+     if (url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/')) {
+-      return forwardToDashboard(request, tenant, env);
++      return forwardToDashboard(request, env);
+     }
+ 
+     return forwardToApi(request, tenant, env);
+diff --git a/workers/router/wrangler.toml b/workers/router/wrangler.toml
+index a259cf6..56f0607 100644
+--- a/workers/router/wrangler.toml
++++ b/workers/router/wrangler.toml
+@@ -11,11 +11,19 @@ binding = "SOLOSTORE_KV"
+ id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
+ preview_id = "c0b19f5d88de4dce8ba7ffd706704c04"
+ 
++# Dashboard static assets (HTML/CSS/JS) — served directly by this Worker.
++# Cloudflare checks this directory for a matching file BEFORE running
++# fetch(); run_worker_first ensures our tenant-resolution + status gate
++# in src/index.ts always runs first, so an unauthenticated/inactive
++# tenant can never reach dashboard files directly by path.
++[assets]
++directory = "./public"
++binding = "ASSETS"
++run_worker_first = true
++
+ [vars]
+ ENVIRONMENT = "development"
+ API_WORKER_URL = "http://localhost:8787"
+-PAGES_URL = "http://localhost:8785"
+-
+ 
+ # Production environment overrides
+ [env.production]
