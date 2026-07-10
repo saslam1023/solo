@@ -174,6 +174,26 @@ async function resolveTenant(
 
   return null;
 }
+// ─── Status gate ──────────────────────────────────────────────────────────────
+//
+// Path-aware: the public storefront requires a fully live store, but
+// owner-authenticated routes (dashboard, settings, products, orders)
+// open earlier so a merchant can finish setup before going live.
+
+const PUBLIC_STOREFRONT_STATUSES = ['ready', 'live'];
+const OWNER_ROUTE_STATUSES = ['pending_products', 'ready', 'live'];
+
+function isPublicStorefrontPath(pathname: string): boolean {
+  return pathname.startsWith('/storefront');
+}
+
+function statusAllowed(pathname: string, status: string): boolean {
+  const allowed = isPublicStorefrontPath(pathname)
+    ? PUBLIC_STOREFRONT_STATUSES
+    : OWNER_ROUTE_STATUSES;
+  return allowed.includes(status);
+}
+
 // ─── Forward request ──────────────────────────────────────────────────────────
 
 async function forwardToApi(
@@ -187,7 +207,19 @@ async function forwardToApi(
   headers.set('x-tenant-id', tenant.id);
   headers.set('x-tenant-slug', tenant.slug ?? '');
 
-  const forwardedRequest = new Request(request.url, {
+  // IMPORTANT: reusing request.url here would target THIS router's own
+  // address (localhost:8786) rather than the API worker (localhost:8787
+  // in dev), causing every forwarded route to loop back and 404 against
+  // the router instead of ever reaching the API. Rebuild the URL against
+  // env.API_WORKER_URL, keeping only the path + query from the original
+  // request.
+  const incomingUrl = new URL(request.url);
+  const targetUrl = new URL(
+    incomingUrl.pathname + incomingUrl.search,
+    env.API_WORKER_URL
+  );
+
+  const forwardedRequest = new Request(targetUrl.toString(), {
     method: request.method,
     headers,
     body: request.body,
@@ -247,7 +279,7 @@ export default {
     const tenant = await resolveTenant(request, env.SOLOSTORE_KV, env);
 
     if (!tenant) {
-      return new Response(JSON.stringify({ error: 'Store not found hit it', tenant: tenant }), {
+      return new Response(JSON.stringify({ error: 'Store not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
       });
