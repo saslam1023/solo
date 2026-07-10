@@ -70,6 +70,9 @@ function isBlockedPath(pathname: string): boolean {
   return BLOCKED_PATH_PATTERNS.some(p => p.test(pathname));
 }
 
+
+
+
 // ─── Tenant resolution ───────────────────────────────────────────────────────
 
 async function resolveTenant(
@@ -77,22 +80,53 @@ async function resolveTenant(
   kv: KVNamespace,
   env: Env
 ): Promise<TenantMeta | null> {
-  const rawHost = request.headers.get('x-dev-host')
+  const rawHost =
+    request.headers.get('x-dev-host')
     ?? request.headers.get('host')
     ?? '';
+
   const hostname = rawHost.split(':')[0].toLowerCase();
 
-  if (!hostname) return null;
+  console.log('resolveTenant:start', {
+    rawHost,
+    hostname,
+    url: request.url,
+  });
+
+  if (!hostname) {
+    console.log('resolveTenant:missing-host');
+    return null;
+  }
+
   console.log(`Resolving tenant for hostname: ${hostname}`);
 
   // ── 1. Custom domain lookup ───────────────────────────────────────────────
-  const domainTenantId = await kv.get(kvKey.tenantByDomain(hostname));
+  const domainKey = kvKey.tenantByDomain(hostname);
+  const domainTenantId = await kv.get(domainKey);
+
+  console.log('resolveTenant:domain-lookup', {
+    domainKey,
+    domainTenantId,
+  });
+
   if (domainTenantId) {
-    const tenant = await kv.get<TenantMeta>(kvKey.tenant(domainTenantId), 'json');
+    const tenantKey = kvKey.tenant(domainTenantId);
+    const tenant = await kv.get<TenantMeta>(tenantKey, 'json');
+
+    console.log('resolveTenant:domain-tenant', {
+      tenantKey,
+      tenantFound: !!tenant,
+      tenantSlug: tenant?.slug,
+      tenantStatus: tenant?.status,
+    });
+
     if (tenant && tenant.customDomainVerified === true) {
+      console.log('resolveTenant:domain-hit-verified');
       return tenant;
     }
+
     if (tenant && tenant.customDomainVerified !== true) {
+      console.log('resolveTenant:domain-hit-unverified');
       return null;
     }
   }
@@ -100,34 +134,46 @@ async function resolveTenant(
   // ── 2. Subdomain slug lookup ──────────────────────────────────────────────
   const parts = hostname.split('.');
   const slug = parts[0];
+  const slugKey = kvKey.tenantBySlug(slug);
+
+  console.log('resolveTenant:slug-prepare', {
+    parts,
+    slug,
+    slugKey,
+    isReserved: isReservedSlug(slug),
+  });
 
   if (parts.length >= 2 && slug && !isReservedSlug(slug)) {
-    const slugTenantId = await kv.get(kvKey.tenantBySlug(slug));
+    const slugTenantId = await kv.get(slugKey);
+
+    console.log('resolveTenant:slug-lookup', {
+      slugKey,
+      slugTenantId,
+    });
+
     if (slugTenantId) {
-      const tenant = await kv.get<TenantMeta>(kvKey.tenant(slugTenantId), 'json');
+      const tenantKey = kvKey.tenant(slugTenantId);
+      const tenant = await kv.get<TenantMeta>(tenantKey, 'json');
+
+      console.log('resolveTenant:slug-tenant', {
+        tenantKey,
+        tenantFound: !!tenant,
+        tenantSlug: tenant?.slug,
+        tenantStatus: tenant?.status,
+      });
+
       if (tenant) return tenant;
     }
   }
 
+  console.log('resolveTenant:not-found', {
+    hostname,
+    domainKey,
+    slugKey,
+  });
+
   return null;
 }
-
-// ─── Status gate ──────────────────────────────────────────────────────────────
-
-const PUBLIC_STOREFRONT_STATUSES = ['ready', 'live'];
-const OWNER_ROUTE_STATUSES = ['pending_products', 'ready', 'live'];
-
-function isPublicStorefrontPath(pathname: string): boolean {
-  return pathname.startsWith('/storefront');
-}
-
-function statusAllowed(pathname: string, status: string): boolean {
-  const allowed = isPublicStorefrontPath(pathname)
-    ? PUBLIC_STOREFRONT_STATUSES
-    : OWNER_ROUTE_STATUSES;
-  return allowed.includes(status);
-}
-
 // ─── Forward request ──────────────────────────────────────────────────────────
 
 async function forwardToApi(

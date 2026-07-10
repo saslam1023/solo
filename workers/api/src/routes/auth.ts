@@ -228,6 +228,7 @@ export async function handleVerify(
   destination = `${platformBase(env)}/onboarding`;
 } else if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status)) {
     destination = `${tenantOrigin(tenant.slug!, env)}/dashboard`;
+    console.log(`Redirecting to tenant dashboard: ${destination}, tenant: ${JSON.stringify(tenant)}`);
     
   
   } else {
