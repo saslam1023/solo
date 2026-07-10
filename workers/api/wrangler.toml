@@ -20,8 +20,8 @@ preview_bucket_name = "solostore-assets-preview"
 
 [vars]
 ENVIRONMENT = "development"
-#API_BASE_URLS=http://localhost:8787
-API_BASE_URL="https://platform.headorn.com"
+API_BASE_URL="http://localhost:8787"
+API_BASE_URLS="https://platform.headorn.com"
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
 
 # Secrets — set via `wrangler secret put`:

@@ -17,7 +17,7 @@ crons = ["* * * * *"]
 [vars]
 ENVIRONMENT = "development"
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
-API_BASE_URL="http://localhost:8787d"
+API_BASE_URL="http://localhost:8787"
 #API_BASE_URL="https://platform.headorn.com"
 
 # Secrets (set via `wrangler secret put`):

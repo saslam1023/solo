@@ -485,7 +485,8 @@
     } else if (status === 'ready' || status === 'live') {
       // Already fully set up — redirect straight to dashboard
       // Dev: router on 8786 handles subdomain simulation via X-Dev-Host
-      window.location.href = `http://localhost:8785/dashboard`; // router forwards with tenant from session
+      //window.location.href = `http://localhost:8785/dashboard`; // router forwards with tenant from session
+      window.location.href = `http://${tenant.slug}.localhost:8786/dashboard`;
     } else {
       document.getElementById('main-content').innerHTML = `
         <div class="error-panel">

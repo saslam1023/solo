@@ -83,6 +83,7 @@ async function resolveTenant(
   const hostname = rawHost.split(':')[0].toLowerCase();
 
   if (!hostname) return null;
+  console.log(`Resolving tenant for hostname: ${hostname}`);
 
   // ── 1. Custom domain lookup ───────────────────────────────────────────────
   const domainTenantId = await kv.get(kvKey.tenantByDomain(hostname));
@@ -162,21 +163,20 @@ async function forwardToApi(
 // is set in wrangler.toml, so static files can never be reached by an
 // unauthenticated request or an inactive tenant.
 //
-// Requests for a bare directory ("/dashboard") are rewritten to the
-// index file, since Cloudflare's asset handler matches by exact path.
+// IMPORTANT: pass the request straight through, unmodified. Cloudflare's
+// asset handler applies its own html_handling logic (default:
+// "auto-trailing-slash") to every ASSETS.fetch() call, which already
+// resolves "/dashboard" -> public/dashboard/index.html implicitly
+// (via a single 307 to "/dashboard/", which the browser follows
+// automatically). Rewriting the path ourselves (e.g. appending
+// "/index.html" or a trailing slash by hand) fights that logic and
+// produces a redirect loop — this was the actual cause of the
+// "Store not found" / infinite-redirect behaviour seen in testing.
 async function forwardToDashboard(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const url = new URL(request.url);
-
-  let assetPath = url.pathname;
-  if (assetPath === '/dashboard' || assetPath === '/dashboard/') {
-    assetPath = '/dashboard/index.html';
-  }
-
-  const assetUrl = new URL(assetPath, url.origin);
-  return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+  return env.ASSETS.fetch(request);
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ export default {
     const tenant = await resolveTenant(request, env.SOLOSTORE_KV, env);
 
     if (!tenant) {
-      return new Response(JSON.stringify({ error: 'Store not found' }), {
+      return new Response(JSON.stringify({ error: 'Store not found hit it', tenant: tenant }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
       });

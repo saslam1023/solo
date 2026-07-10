@@ -61,6 +61,12 @@ function tenantOrigin(slug: string, env: Env): string {
     : `http://${slug}.localhost:8786`; // dev: router on 8786, real subdomain via *.localhost
 }
 
+function apiBase(env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? 'https://api.headorn.com'
+    : 'http://localhost:8787';
+}
+
 // ---------------------------------------------------------------------------
 // HTML escaping
 // Prevents user-controlled values breaking email HTML
@@ -131,7 +137,7 @@ export async function handleMagicLink(
       linkBase = platformBase(env);
     }
 
-    const magicUrl = `${linkBase}/auth/verify?token=${token}`;
+    const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
 
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -208,6 +214,7 @@ export async function handleVerify(
 
   let destination: string;
 
+  /*
   if ((ONBOARDING_STATUSES as readonly string[]).includes(tenant.status)) {
     destination = '/onboarding';
   } else if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status)) {
@@ -215,7 +222,18 @@ export async function handleVerify(
   } else {
     destination = '/onboarding';
   }
-
+*/
+  
+  if ((ONBOARDING_STATUSES as readonly string[]).includes(tenant.status)) {
+  destination = `${platformBase(env)}/onboarding`;
+} else if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status)) {
+    destination = `${tenantOrigin(tenant.slug!, env)}/dashboard`;
+    
+  
+  } else {
+    destination = '/onboarding';
+}
+  
   return new Response(null, {
     status: 302,
     headers: {
