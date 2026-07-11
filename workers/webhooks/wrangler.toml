@@ -32,7 +32,7 @@ name = "solostore-webhooks-production"
 [env.production.vars]
 ENVIRONMENT = "production"
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
-API_BASE_URL = "https://api.headorn.com"
+API_BASE_URL = ""
 
 [[env.production.kv_namespaces]]
 binding = "SOLOSTORE_KV"

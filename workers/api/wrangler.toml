@@ -37,7 +37,7 @@ name = "solostore-api-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"
-API_BASE_URL = "https://api.headorn.com"
+API_BASE_URL = ""
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
 
 [[env.production.kv_namespaces]]
