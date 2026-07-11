@@ -36,3 +36,8 @@ API_WORKER_URL = ""  # not used in prod — service binding used instead
 [[env.production.kv_namespaces]]
 binding = "SOLOSTORE_KV"
 id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
+
+
+[[env.production.services]]
+binding = "API"
+service = "solostore-api-production"

@@ -47,7 +47,7 @@ export interface Env {
   API_WORKER_URL: string;   // dev only: http://localhost:8787
   ASSETS: Fetcher;          // dashboard static build, bound via [assets] in wrangler.toml
   // Service binding — uncomment when deploying:
-  // API: Fetcher;
+   API: Fetcher;
 }
 
 // ─── WAF: Blocked paths ───────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ async function forwardToApi(
   });
 
   // Production: use service binding
-  // if (env.API) return env.API.fetch(forwardedRequest);
+   if (env.API) return env.API.fetch(forwardedRequest);
 
   // Dev: proxy via fetch to local API worker
   return fetch(forwardedRequest);
