@@ -443,7 +443,7 @@
 
 <script>
  //dev const API = 'http://localhost:8787';
-  const API = env.API_BASE || 'https://api.headorn.com';
+  const API = env.API_BASE_URL || 'https://api.headorn.com';
 
   if (new URLSearchParams(window.location.search).get('cancelled') === 'true') {
     document.getElementById('cancelled-notice').hidden = false;
