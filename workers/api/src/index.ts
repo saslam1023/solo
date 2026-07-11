@@ -46,6 +46,8 @@ import { requireAuth } from './lib/auth';
 // only dashboard origins that send the session cookie need to be in this list.
 
 const ALLOWED_ORIGINS = new Set([
+  'https://headorn.com',
+  'https://api.headorn.com',
   'http://localhost:8787', 
   'http://localhost:8788', 
   'http://localhost:8789',          // platform.headorn.com dev server

@@ -241,7 +241,8 @@
   </div>
 
 <script>
-  const API = 'http://localhost:8787'; // dev — replace with https://api.headorn.com in prod
+  // const API = 'http://localhost:8787'; // dev — replace with https://api.headorn.com in prod
+  const API = env.API_BASE || 'https://api.headorn.com';
 
   // Pull email from sessionStorage if the signup form stored it
   // (index.html should store it before redirecting to Stripe)
