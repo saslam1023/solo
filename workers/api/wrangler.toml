@@ -47,3 +47,7 @@ id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
 [[env.production.r2_buckets]]
 binding = "SOLOSTORE_R2"
 bucket_name = "solostore-assets"
+
+[[env.production.routes]]
+pattern = "api.headorn.com/*"
+zone_name = "headorn.com"

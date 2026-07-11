@@ -4,7 +4,7 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [dev]
-port = 8787
+port = 8788
 
 [[kv_namespaces]]
 binding = "SOLOSTORE_KV"
@@ -17,8 +17,7 @@ crons = ["* * * * *"]
 [vars]
 ENVIRONMENT = "development"
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
-API_BASE_URL="http://localhost:8787"
-#API_BASE_URL="https://headorn.com"
+API_BASE_URL = "http://localhost:8787"
 
 # Secrets (set via `wrangler secret put`):
 #   STRIPE_SECRET_KEY
@@ -32,8 +31,12 @@ name = "solostore-webhooks-production"
 [env.production.vars]
 ENVIRONMENT = "production"
 RESEND_FROM = "SoloStore <onboarding@headorn.com>"
-API_BASE_URL = ""
+API_BASE_URL = "https://api.headorn.com"
 
 [[env.production.kv_namespaces]]
 binding = "SOLOSTORE_KV"
 id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
+
+[[env.production.routes]]
+pattern = "hooks.headorn.com/*"
+zone_name = "headorn.com"

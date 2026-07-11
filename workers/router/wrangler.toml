@@ -42,3 +42,8 @@ id = "f71e79c3fcc24c8c8516ddfbc5ed050d"
 [[env.production.services]]
 binding = "API"
 service = "solostore-api-production"
+
+
+[[env.production.routes]]
+pattern = "*.headorn.com/*"
+zone_name = "headorn.com"
