@@ -27,6 +27,18 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
 
+  pages/platform:
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20240529.0
+        version: 4.20260626.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.105.0
+        version: 4.105.0(@cloudflare/workers-types@4.20260626.1)
+
   pages/storefront: {}
 
   workers/api:
