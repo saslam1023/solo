@@ -165,7 +165,7 @@ async function createCheckoutSession(
   // Platform domain — no hardcoded external domains
   const platformBase =
     env.ENVIRONMENT === "production"
-      ? "https://platform.headorn.com"
+      ? "https://headorn.com"
       : "http://localhost:8789";
 
   const body = new URLSearchParams({
@@ -181,7 +181,7 @@ async function createCheckoutSession(
     "line_items[0][price_data][unit_amount]": "18000",
     "line_items[0][quantity]": "1",
 
-    // After payment: verify endpoint mints session, redirects to platform.headorn.com/onboarding
+    // After payment: verify endpoint mints session, redirects to headorn.com/onboarding
     success_url: `${platformBase}/pending`,  // static "check your email" page — real magic link sent by cron after webhook fires
     cancel_url: `${platformBase}/?cancelled=true`,
 

@@ -1,11 +1,11 @@
 # pages/platform/wrangler.toml
-# Serves platform.headorn.com (one project, path-based routing):
+# Serves headorn.com (one project, path-based routing):
 #   /            → index.html  (signup)
 #   /onboarding  → onboarding.html
 #   /admin   → admin.html  (platform owner admin — future)
 #   /auth-error  → auth-error.html
 #
-# In Cloudflare dashboard: Settings > Custom domains > platform.headorn.com
+# In Cloudflare dashboard: Settings > Custom domains > headorn.com
 
 name = "solostore-platform"
 pages_build_output_dir = "src"

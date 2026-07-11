@@ -50,9 +50,9 @@ const ALLOWED_ORIGINS = new Set([
   'https://api.headorn.com',
   'http://localhost:8787', 
   'http://localhost:8788', 
-  'http://localhost:8789',          // platform.headorn.com dev server
+  'http://localhost:8789',          // headorn.com dev server
   'http://localhost:8786',          // Router dev
-  'https://platform.headorn.com',   // Platform — signup, /onboarding, /dashboard
+  'https://headorn.com',   // Platform — signup, /onboarding, /dashboard
   // Tenant subdomains (newstore.headorn.com/admin) handled dynamically below
 ]);
 

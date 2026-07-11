@@ -148,7 +148,7 @@ export async function handleConnectReturn(
 
   const onboardingUrl =
   env.ENVIRONMENT === 'production'
-    ? 'https://platform.headorn.com/onboarding'
+    ? 'https://headorn.com/onboarding'
     : 'http://localhost:8789/onboarding';
 
 return new Response(null, {

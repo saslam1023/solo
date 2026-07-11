@@ -227,7 +227,7 @@ const allowedHosts =
     ? [
         "localhost",
       "127.0.0.1",
-        "platform.headorn.com",
+        "headorn.com",
         "api.headorn.com",
         "api-staging.headorn.com",
       ]

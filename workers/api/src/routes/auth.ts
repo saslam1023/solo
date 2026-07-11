@@ -27,10 +27,10 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
 
 // ── URL helpers ───────────────────────────────────────────────────
 //
-// Platform lives at platform.headorn.com (one Pages project, path-based):
-//   platform.headorn.com/           ← signup
-//   platform.headorn.com/onboarding ← post-magic-link setup + Connect
-//   platform.headorn.com/admin      ← platform owner admin (Queen's view)
+// Platform lives at headorn.com (one Pages project, path-based):
+//   headorn.com/           ← signup
+//   headorn.com/onboarding ← post-magic-link setup + Connect
+//   headorn.com/admin      ← platform owner admin (Queen's view)
 //
 // Each merchant tenant lives at:
 //   newstore.headorn.com/dashboard  ← merchant's own dashboard
@@ -51,7 +51,7 @@ const ONBOARDING_STATUSES = ['pending_verification', 'pending_onboarding', 'pend
 
 function platformBase(env: Env): string {
   return env.ENVIRONMENT === 'production'
-    ? 'https://platform.headorn.com'
+    ? 'https://headorn.com'
     : 'http://localhost:8789';
 }
 
