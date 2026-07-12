@@ -551,7 +551,7 @@ await env.SOLOSTORE_KV.put(
   { expirationTtl: 900 }
 );
 
-const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
+const magicUrl = `/auth/verify?token=${token}`;
 
   try {
     await sendMagicLink({
@@ -822,7 +822,7 @@ async function handleCron(env: Env): Promise<void> {
       );
 
       // Use API_BASE_URL env var — no hardcoding
-      const magicUrl = `${env.API_BASE_URL}/auth/verify?token=${token}`;
+      const magicUrl = `/auth/verify?token=${token}`;
 
       await sendMagicLink({ to: customer.email, magicUrl, tenantSlug: slug, env });
 
