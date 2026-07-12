@@ -440,6 +440,7 @@
 <script>
   // const API = 'http://localhost:8787'; // dev
   const API = 'https://api.headorn.com';
+  const PLATFORM_BASE = 'headorn.com';
 
 
   let tenant = null;
@@ -488,7 +489,7 @@
       // Already fully set up — redirect straight to dashboard
       // Dev: router on 8786 handles subdomain simulation via X-Dev-Host
       //window.location.href = `http://localhost:8785/dashboard`; // router forwards with tenant from session
-      window.location.href = `http://${tenant.slug}.localhost:8786/dashboard`;
+      window.location.href = `http://${tenant.slug}.${PLATFORM_BASE}/dashboard`;
     } else {
       document.getElementById('main-content').innerHTML = `
         <div class="error-panel">
@@ -597,7 +598,7 @@
   // ── Complete panel ─────────────────────────────────────────────────────────
   function showCompletePanel() {
    // const adminUrl = `http://localhost:8786/admin`; // dev — router on 8786
-    const adminUrl = `http://${tenant.slug}.localhost:8786/dashboard`;
+    const adminUrl = `http://${tenant.slug}.${PLATFORM_BASE}/dashboard`;
 
     document.getElementById('main-content').innerHTML = `
       <div class="complete-panel">
