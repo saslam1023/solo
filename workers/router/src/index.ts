@@ -207,12 +207,23 @@ async function forwardToApi(
   headers.set('x-tenant-id', tenant.id);
   headers.set('x-tenant-slug', tenant.slug ?? '');
 
-  // IMPORTANT: reusing request.url here would target THIS router's own
-  // address (localhost:8786) rather than the API worker (localhost:8787
-  // in dev), causing every forwarded route to loop back and 404 against
-  // the router instead of ever reaching the API. Rebuild the URL against
-  // env.API_WORKER_URL, keeping only the path + query from the original
-  // request.
+  // Production: service binding routes by binding, not by URL host —
+  // the original request URL is fine to reuse as-is.
+  if (env.API) {
+    const forwardedRequest = new Request(request.url, {
+      method: request.method,
+      headers,
+      body: request.body,
+    });
+    return env.API.fetch(forwardedRequest);
+  }
+
+  // Dev: no service binding, so this is a real network fetch. Reusing
+  // request.url here would target THIS router's own address
+  // (localhost:8786) rather than the API worker (localhost:8787),
+  // causing every forwarded route to loop back and 404 against the
+  // router instead of ever reaching the API — rebuild against
+  // env.API_WORKER_URL instead.
   const incomingUrl = new URL(request.url);
   const targetUrl = new URL(
     incomingUrl.pathname + incomingUrl.search,
@@ -225,10 +236,6 @@ async function forwardToApi(
     body: request.body,
   });
 
-  // Production: use service binding
-   if (env.API) return env.API.fetch(forwardedRequest);
-
-  // Dev: proxy via fetch to local API worker
   return fetch(forwardedRequest);
 }
 
