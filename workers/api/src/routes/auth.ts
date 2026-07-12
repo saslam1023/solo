@@ -137,8 +137,8 @@ export async function handleMagicLink(
       linkBase = platformBase(env);
     }
 
-    const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
-   // const magicUrl = `${linkBase}/auth/verify?token=${token}`;
+   // const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
+    const magicUrl = `${linkBase}/auth/verify?token=${token}`;
 
 
     await fetch('https://api.resend.com/emails', {
@@ -194,7 +194,7 @@ export async function handleVerify(
   // actually serving this request (platform or tenant subdomain) —
   // fixes the earlier "relative paths in error redirects" issue by
   // making that behaviour deliberate rather than accidental.
-  if (!token) {
+/*  if (!token) {
     return Response.redirect(`${url.origin}/auth-error?reason=missing_token`, 302);
   }
 
@@ -207,6 +207,20 @@ export async function handleVerify(
   if (!tenant) {
     return Response.redirect(`${url.origin}/auth-error?reason=tenant_not_found`, 302);
   }
+  */
+
+if (!token) {
+  return Response.redirect(`${platformBase(env)}/auth-error?reason=missing_token`, 302);
+}
+const payload = await consumeMagicToken(env, token);
+if (!payload) {
+  return Response.redirect(`${platformBase(env)}/auth-error?reason=invalid_or_expired`, 302);
+}
+
+const tenant = await getTenantMeta(env, payload.tenantId);
+if (!tenant) {
+  return Response.redirect(`${platformBase(env)}/auth-error?reason=tenant_not_found`, 302);
+}
 
   const sessionId = await createSession(env, payload.tenantId);
 
@@ -238,7 +252,9 @@ export async function handleVerify(
     
   
   } else {
-    destination = '/onboarding';
+    //destination = '/onboarding';
+      destination = `${platformBase(env)}/auth-error?reason=account_closed`;
+
 }
   
   return new Response(null, {
