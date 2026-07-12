@@ -137,8 +137,8 @@ export async function handleMagicLink(
       linkBase = platformBase(env);
     }
 
-    //const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
-    const magicUrl = `${linkBase}/auth/verify?token=${token}`;
+    const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
+   // const magicUrl = `${linkBase}/auth/verify?token=${token}`;
 
 
     await fetch('https://api.resend.com/emails', {
