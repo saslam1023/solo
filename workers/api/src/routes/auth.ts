@@ -160,6 +160,10 @@ export async function handleMagicLink(
           </a></p>
           <p>This link expires in 15 minutes and can only be used once.</p>
           <p>If you didn't request this, you can safely ignore this email.</p>
+           <p style="font-size:13px;color:#bbb;margin-top:8px;">
+            Can't click? Copy this URL:<br>
+            <span style="word-break:break-all;">${escapeHtml(magicUrl)}</span>
+          </p>
         `,
       }),
     });
