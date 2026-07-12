@@ -831,7 +831,7 @@ async function handleCron(env: Env): Promise<void> {
       await sendMagicLink({ to: customer.email, magicUrl, tenantSlug: slug, env });
 
       // Delete AFTER successful send so failures leave the key for retry
-      await env.SOLOSTORE_KV.delete(key);
+     // await env.SOLOSTORE_KV.delete(key);
 
       console.log(`[cron] Magic link sent to ${customer.email} for tenant ${tenantId} (${slug})`);
     } catch (err) {

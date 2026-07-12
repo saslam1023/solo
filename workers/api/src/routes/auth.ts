@@ -137,8 +137,8 @@ export async function handleMagicLink(
       linkBase = platformBase(env);
     }
 
-   // const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
-    const magicUrl = `${linkBase}/auth/verify?token=${token}`;
+   const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
+   // const magicUrl = `${linkBase}/auth/verify?token=${token}`;
 console.log('DEBUG magicUrl1:', magicUrl);
 
 
