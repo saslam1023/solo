@@ -150,6 +150,7 @@ export async function handleMagicLink(
         to: [email],
         subject: 'Sign in to your SoloStore dashboard',
         html: `
+        <h1>Test SoloStore</h1>
           <p>Click the link below to sign in to your SoloStore dashboard.</p>
           <p><a href="${escapeHtml(magicUrl)}"
              style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;
