@@ -1,12 +1,135 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SoloStore</title>
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title id="seo-title">Store</title>
+
+  <meta
+    name="description"
+    id="seo-description"
+    content="Discover products from this independent store."
+  >
+
+  <link rel="canonical" id="seo-canonical" href="/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" id="og-title" content="Store">
+  <meta property="og:description" id="og-description" content="">
+  <meta property="og:url" id="og-url" content="/">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" id="twitter-title" content="Store">
+  <meta name="twitter:description" id="twitter-description" content="">
+
+  <script type="application/ld+json" id="store-schema">
+  {}
+  </script>
+
+  <link rel="stylesheet" href="/storefront.css">
 </head>
+
 <body>
-  <h1>SoloStore Storefront</h1>
-  <p>Phase 6: React storefront goes here.</p>
+
+<header class="store-header">
+
+  <a href="/" class="store-brand" id="store-name">
+    Store
+  </a>
+
+  <button
+    class="cart-trigger"
+    id="cart-open"
+    aria-label="Open shopping cart"
+  >
+    Cart
+    <span id="cart-count">0</span>
+  </button>
+
+</header>
+
+
+<main>
+
+<section class="store-hero">
+
+  <h1 id="store-title">
+    Welcome
+  </h1>
+
+  <p id="store-description">
+    Independent products from this store.
+  </p>
+
+</section>
+
+
+<section
+  class="products-section"
+  aria-label="Products"
+>
+
+<div
+  class="product-grid"
+  id="product-grid"
+>
+</div>
+
+</section>
+
+</main>
+
+
+
+<aside
+  class="cart-panel"
+  id="cart-panel"
+  hidden
+  aria-label="Shopping cart"
+>
+
+<header class="cart-header">
+
+<h2>
+Your cart
+</h2>
+
+<button
+ id="cart-close"
+ aria-label="Close cart"
+>
+Close
+</button>
+
+</header>
+
+
+<div id="cart-items"></div>
+
+
+<footer class="cart-footer">
+
+<strong id="cart-total">
+£0.00
+</strong>
+
+
+<button
+ id="checkout"
+>
+Checkout
+</button>
+
+
+</footer>
+
+</aside>
+
+
+
+<script src="/storefront.js"></script>
+
 </body>
 </html>
