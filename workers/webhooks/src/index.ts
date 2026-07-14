@@ -45,6 +45,22 @@ export interface Env {
   API_BASE_URL: string;                   // e.g. https://api.headorn.com
 }
 
+// ── URL helpers (mirrors workers/api/src/routes/auth.ts) ──────────
+// __Host- cookies are locked to the exact host that sets them, so
+// magic links must point at the correct host up front — see auth.ts
+// for the full rationale.
+
+function platformBase(env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? 'https://headorn.com'
+    : 'http://localhost:8789';
+}
+
+function tenantOrigin(slug: string, env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? `https://${slug}.headorn.com`
+    : `http://${slug}.localhost:8786`;
+}
 
 // ---------------------------------------------------------------------------
 // HTML escaping
@@ -551,8 +567,10 @@ await env.SOLOSTORE_KV.put(
   { expirationTtl: 900 }
 );
 
-  const magicUrl = `/authentakor/verify?token=${token}`;
-  console.log('DEBUG magicUrl2:', magicUrl);
+// Brand-new registration — tenant is always in an onboarding status
+  // at this point (pending_verification), never a merchant status yet,
+  // so this always goes to the platform host.
+  const magicUrl = `${platformBase(env)}/auth/verify?token=${token}`;
 
 
   try {
@@ -824,8 +842,7 @@ async function handleCron(env: Env): Promise<void> {
       );
 
       // Use API_BASE_URL env var — no hardcoding
-      const magicUrl = `/authicator/verify?token=${token}`;
-      console.log('DEBUG magicUrl3:', magicUrl);
+const magicUrl = `${platformBase(env)}/auth/verify?token=${token}`;
 
 
       await sendMagicLink({ to: customer.email, magicUrl, tenantSlug: slug, env });
