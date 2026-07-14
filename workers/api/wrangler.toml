@@ -50,3 +50,6 @@ bucket_name = "solostore-assets"
 [[env.production.routes]]
 pattern = "api.headorn.com/*"
 zone_name = "headorn.com"
+
+[observability]
+enabled = true

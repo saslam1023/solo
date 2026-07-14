@@ -110,6 +110,8 @@ export async function requireAuth(
   if (!session) {
     return Response.json({ error: 'Session expired or invalid' }, { status: 401 });
   }
+  console.log("AUTH COOKIE", request.headers.get("cookie"));
+  console.log("AUTH SESSION", session);
 
   return { tenantId: session.tenantId };
 }
