@@ -137,10 +137,7 @@ export async function handleMagicLink(
       linkBase = platformBase(env);
     }
 
-   const magicUrl = `${apiBase(env)}/auth/verify?token=${token}`;
-   // const magicUrl = `${linkBase}/auth/verify?token=${token}`;
-console.log('DEBUG magicUrl1:', magicUrl);
-
+    const magicUrl = `${linkBase}/auth/verify?token=${token}`;
 
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -191,37 +188,21 @@ export async function handleVerify(
   const url   = new URL(request.url);
   const token = url.searchParams.get('token') ?? '';
 
-  // Error redirects: relative, so they stay on whichever host is
-  // actually serving this request (platform or tenant subdomain) —
-  // fixes the earlier "relative paths in error redirects" issue by
-  // making that behaviour deliberate rather than accidental.
-/*  if (!token) {
-    return Response.redirect(`${url.origin}/auth-error?reason=missing_token`, 302);
+  // Error redirects always point at the platform host, since
+  // auth-error.html only exists in pages/platform — it's never
+  // served from a tenant subdomain.
+  if (!token) {
+    return Response.redirect(`${platformBase(env)}/auth-error?reason=missing_token`, 302);
   }
-
   const payload = await consumeMagicToken(env, token);
   if (!payload) {
-    return Response.redirect(`${url.origin}/auth-error?reason=invalid_or_expired`, 302);
+    return Response.redirect(`${platformBase(env)}/auth-error?reason=invalid_or_expired`, 302);
   }
 
   const tenant = await getTenantMeta(env, payload.tenantId);
   if (!tenant) {
-    return Response.redirect(`${url.origin}/auth-error?reason=tenant_not_found`, 302);
+    return Response.redirect(`${platformBase(env)}/auth-error?reason=tenant_not_found`, 302);
   }
-  */
-
-if (!token) {
-  return Response.redirect(`${platformBase(env)}/auth-error?reason=missing_token`, 302);
-}
-const payload = await consumeMagicToken(env, token);
-if (!payload) {
-  return Response.redirect(`${platformBase(env)}/auth-error?reason=invalid_or_expired`, 302);
-}
-
-const tenant = await getTenantMeta(env, payload.tenantId);
-if (!tenant) {
-  return Response.redirect(`${platformBase(env)}/auth-error?reason=tenant_not_found`, 302);
-}
 
   const sessionId = await createSession(env, payload.tenantId);
 
@@ -235,29 +216,14 @@ if (!tenant) {
 
   let destination: string;
 
-  /*
   if ((ONBOARDING_STATUSES as readonly string[]).includes(tenant.status)) {
-    destination = '/onboarding';
+    destination = `${platformBase(env)}/onboarding`;
   } else if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status)) {
-    destination = '/dashboard';
-  } else {
-    destination = '/onboarding';
-  }
-*/
-  
-  if ((ONBOARDING_STATUSES as readonly string[]).includes(tenant.status)) {
-  destination = `${platformBase(env)}/onboarding`;
-} else if ((MERCHANT_STATUSES as readonly string[]).includes(tenant.status)) {
     destination = `${tenantOrigin(tenant.slug!, env)}/dashboard`;
-    console.log(`Redirecting to tenant dashboard: ${destination}, tenant: ${JSON.stringify(tenant)}`);
-    
-  
   } else {
-    //destination = '/onboarding';
-      destination = `${platformBase(env)}/auth-error?reason=account_closed`;
+    destination = `${platformBase(env)}/auth-error?reason=account_closed`;
+  }
 
-}
-  
   return new Response(null, {
     status: 302,
     headers: {

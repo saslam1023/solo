@@ -12,6 +12,19 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+// Connect onboarding runs while a tenant is in an onboarding status
+// (pending_connect) — per auth.ts, that means the session cookie was
+// set on the platform host, not api.headorn.com. Stripe's refresh_url
+// and return_url must land back on the same host or resolveTenant()
+// below will never find the session cookie. Mirrors platformBase()
+// in routes/auth.ts — kept local here rather than shared to avoid
+// touching @solostore/shared mid-fix; worth consolidating later.
+function platformBase(env: Env): string {
+  return env.ENVIRONMENT === 'production'
+    ? 'https://headorn.com'
+    : 'http://localhost:8789';
+}
+
 // ── Shared auth helper ────────────────────────────────────────────────────────
 // Returns tenantMeta if session is valid, or a Response to return early.
 
@@ -89,12 +102,10 @@ export async function handleConnectStart(
   }
 
   // Issue Account Link (expires ~5 min — /connect/refresh handles expiry)
-
-  
   const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
     account: accountId,
-    refresh_url: `${env.API_BASE_URL}/connect/refresh`,
-    return_url: `${env.API_BASE_URL}/connect/return`,
+    refresh_url: `${platformBase(env)}/connect/refresh`,
+    return_url: `${platformBase(env)}/connect/return`,
     type: 'account_onboarding',
   });
 
@@ -146,17 +157,12 @@ export async function handleConnectReturn(
     await env.SOLOSTORE_KV.put(kvKey.tenant(tenantId), JSON.stringify(updated));
   }
 
-  const onboardingUrl =
-  env.ENVIRONMENT === 'production'
-    ? 'https://headorn.com/onboarding'
-    : 'http://localhost:8789/onboarding';
-
-return new Response(null, {
-  status: 302,
-  headers: {
-    Location: onboardingUrl,
-  },
-});
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: `${platformBase(env)}/onboarding`,
+    },
+  });
 }
 
 // ── GET /connect/refresh ──────────────────────────────────────────────────────
@@ -175,10 +181,10 @@ export async function handleConnectRefresh(
     return json({ error: 'No Connect account found — start onboarding first' }, 400);
   }
 
-const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
+  const linkRes = await stripePost(env.STRIPE_SECRET_KEY, '/v1/account_links', {
     account: tenant.stripeAccountId,
-    refresh_url: `${env.API_BASE_URL}/connect/refresh`,
-    return_url: `${env.API_BASE_URL}/connect/return`,
+    refresh_url: `${platformBase(env)}/connect/refresh`,
+    return_url: `${platformBase(env)}/connect/return`,
     type: 'account_onboarding',
   });
 
