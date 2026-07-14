@@ -137,7 +137,6 @@ export async function handleMagicLink(
       linkBase = platformBase(env);
     }
 
-    //  const magicUrl = `${linkBase}/auth/verify?token=${token}`;
     const magicUrl = `/auth/verify?token=${token}`;
 
     await fetch('https://api.resend.com/emails', {
@@ -151,7 +150,7 @@ export async function handleMagicLink(
         to: [email],
         subject: 'Sign in to your SoloStore dashboard',
         html: `
-        <h1>Test SoloStore</h1>
+        <h1>Test SoloStore 2</h1>
           <p>Click the link below to sign in to your SoloStore dashboard.</p>
           <p><a href="${escapeHtml(magicUrl)}"
              style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;
