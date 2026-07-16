@@ -442,8 +442,14 @@
   </div>
 
 <script>
- //dev const API = 'http://localhost:8787';
-  const API = 'https://api.headorn.com';
+  // Same-origin: /register, /register/check-slug and /auth/magic-link
+  // are routed to the API worker directly on this host (see
+  // [[env.production.routes]] "headorn.com/register*" and
+  // "headorn.com/auth/*" in workers/api/wrangler.toml). Do not point
+  // this at api.headorn.com — that was cross-origin and, for any call
+  // that reads a session cookie, was structurally unfixable by CORS
+  // alone (the __Host- cookie set here can never be sent there).
+  const API = '';
 
 
   if (new URLSearchParams(window.location.search).get('cancelled') === 'true') {

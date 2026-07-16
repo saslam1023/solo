@@ -438,8 +438,15 @@
   </div>
 
 <script>
-  // const API = 'http://localhost:8787'; // dev
-  const API = 'https://api.headorn.com';
+  // Same-origin: /auth/me and /connect/start are routed to the API
+  // worker directly on this host (see [[env.production.routes]]
+  // "headorn.com/auth/*" and "headorn.com/connect/*" in
+  // workers/api/wrangler.toml). This was previously cross-origin
+  // against api.headorn.com, which could never work for these two
+  // calls specifically: both send credentials:'include', but the
+  // __Host- session cookie set on headorn.com by /auth/verify is
+  // never sent to a different host, CORS or not.
+  const API = '';
   const PLATFORM_BASE = 'headorn.com';
 
 
@@ -489,7 +496,7 @@
       // Already fully set up — redirect straight to dashboard
       // Dev: router on 8786 handles subdomain simulation via X-Dev-Host
       //window.location.href = `http://localhost:8785/dashboard`; // router forwards with tenant from session
-      window.location.href = `http://${tenant.slug}.${PLATFORM_BASE}/dashboard`;
+      window.location.href = `https://${tenant.slug}.${PLATFORM_BASE}/dashboard`;
     } else {
       document.getElementById('main-content').innerHTML = `
         <div class="error-panel">
@@ -598,7 +605,7 @@
   // ── Complete panel ─────────────────────────────────────────────────────────
   function showCompletePanel() {
    // const adminUrl = `http://localhost:8786/admin`; // dev — router on 8786
-    const adminUrl = `http://${tenant.slug}.${PLATFORM_BASE}/dashboard`;
+    const adminUrl = `https://${tenant.slug}.${PLATFORM_BASE}/dashboard`;
 
     document.getElementById('main-content').innerHTML = `
       <div class="complete-panel">

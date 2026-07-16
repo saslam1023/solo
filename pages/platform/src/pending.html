@@ -241,8 +241,10 @@
   </div>
 
 <script>
-  // const API = 'http://localhost:8787'; // dev — replace with https://api.headorn.com in prod
-  const API = 'https://api.headorn.com';
+  // Same-origin: /auth/magic-link is routed to the API worker
+  // directly on this host (see [[env.production.routes]]
+  // "headorn.com/auth/*" in workers/api/wrangler.toml).
+  const API = '';
 
 
   // Pull email from sessionStorage if the signup form stored it
