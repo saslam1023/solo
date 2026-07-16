@@ -51,5 +51,21 @@ bucket_name = "solostore-assets"
 pattern = "api.headorn.com/*"
 zone_name = "headorn.com"
 
+[[env.production.routes]]
+pattern = "headorn.com/register"
+zone_name = "headorn.com"
+
+[[env.production.routes]]
+pattern = "headorn.com/register/*"
+zone_name = "headorn.com"
+
+[[env.production.routes]]
+pattern = "headorn.com/auth/*"
+zone_name = "headorn.com"
+
+[[env.production.routes]]
+pattern = "headorn.com/connect/*"
+zone_name = "headorn.com"
+
 [observability]
 enabled = true
